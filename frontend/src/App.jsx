@@ -101,7 +101,47 @@ function App() {
         return item.exchange !== "KRX" && !item.tvSymbol?.startsWith("KRX:");
       });
 
-      setStockSearchResults(filteredResults);
+      const enrichedResults = await Promise.all(
+        filteredResults.slice(0, 12).map(async (item) => {
+          const market = item.tvSymbol?.startsWith("KRX:") ? "KR" : "US";
+
+          try {
+            const quoteRes = await fetch(
+              `${API_BASE}/api/stock-quote?symbol=${encodeURIComponent(
+                item.symbol
+              )}&market=${market}`
+            );
+
+            const quote = await quoteRes.json();
+
+            return {
+              ...item,
+              market,
+              price: quote.price,
+              usd: quote.usd || item.tvSymbol,
+              base_price_text: quote.base_price_text,
+              diff_from_base: quote.diff_from_base,
+              percent_from_base: quote.percent_from_base,
+              is_up: quote.is_up,
+              updated_at: quote.updated_at,
+            };
+          } catch (err) {
+            return {
+              ...item,
+              market,
+              price: "데이터 없음",
+              usd: item.tvSymbol,
+              base_price_text: "데이터 없음",
+              diff_from_base: "계산 불가",
+              percent_from_base: "0.00%",
+              is_up: false,
+              updated_at: "",
+            };
+          }
+        })
+      );
+
+      setStockSearchResults(enrichedResults);
     } catch (err) {
       console.error("주식 검색 오류:", err);
     }
@@ -247,7 +287,7 @@ function App() {
 
       <div style={styles.stockName}>{stock.name}</div>
       <div style={styles.symbol}>{stock.symbol}</div>
-      <div style={styles.price}>{stock.price || "차트 검색 종목"}</div>
+      <div style={styles.price}>{stock.price || "데이터 없음"}</div>
       <div style={styles.usd}>{stock.usd || stock.tvSymbol || ""}</div>
 
       <div
@@ -258,7 +298,7 @@ function App() {
           marginTop: "10px",
         }}
       >
-        {stock.percent_from_base || "차트 확인 가능"}
+        {stock.percent_from_base || "0.00%"}
       </div>
 
       <div
@@ -268,13 +308,11 @@ function App() {
           fontSize: "16px",
         }}
       >
-        {stock.diff_from_base
-          ? `최근 종가 대비 ${stock.diff_from_base}`
-          : "클릭하면 해당 종목 차트로 이동"}
+        최근 종가 대비 {stock.diff_from_base || "계산 불가"}
       </div>
 
       <div style={styles.bottomRow}>
-        <span>최근 종가: {stock.base_price_text || "검색 결과"}</span>
+        <span>최근 종가: {stock.base_price_text || "데이터 없음"}</span>
         <span>{stock.updated_at || ""}</span>
       </div>
 
@@ -299,15 +337,15 @@ function App() {
           return {
             name: item.name,
             symbol: item.symbol,
-            market: stockMarketTab,
+            market: item.market || stockMarketTab,
             tvSymbol: item.tvSymbol,
-            price: "",
-            usd: item.tvSymbol,
-            percent_from_base: "",
-            diff_from_base: "",
-            base_price_text: "",
-            is_up: true,
-            updated_at: "",
+            price: item.price || "데이터 없음",
+            usd: item.usd || item.tvSymbol,
+            percent_from_base: item.percent_from_base || "0.00%",
+            diff_from_base: item.diff_from_base || "계산 불가",
+            base_price_text: item.base_price_text || "데이터 없음",
+            is_up: item.is_up ?? false,
+            updated_at: item.updated_at || "",
           };
         })
       : filteredStocks;
