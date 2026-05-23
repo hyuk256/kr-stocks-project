@@ -16,6 +16,8 @@ function App() {
   const [watchlist, setWatchlist] = useState([]);
   const [time, setTime] = useState("");
 
+  const [marketSummary, setMarketSummary] = useState(null);
+  
   const tabs = ["주식", "차트", "분석", "이슈", "관심종목"];
 
   const API_BASE = "https://kr-stocks-backend.onrender.com";

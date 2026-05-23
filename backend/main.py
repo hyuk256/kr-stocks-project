@@ -318,3 +318,77 @@ def search_symbols(q: str = Query(...)):
             results.append(item)
 
     return {"results": results[:50]}
+
+def fetch_yahoo_index(symbol):
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=2d&interval=1d"
+
+    try:
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        data = res.json()
+
+        result = data["chart"]["result"][0]
+        meta = result["meta"]
+
+        current = meta.get("regularMarketPrice", 0)
+        previous = meta.get("chartPreviousClose", 0)
+
+        if not current or not previous:
+            return None
+
+        diff = current - previous
+        percent = (diff / previous) * 100
+
+        return {
+            "price": round(current, 2),
+            "previous": round(previous, 2),
+            "diff": round(diff, 2),
+            "percent": round(percent, 2),
+            "is_up": diff >= 0,
+        }
+
+    except Exception as e:
+        print("지수 데이터 오류:", symbol, e)
+        return None
+
+@app.get("/api/market-summary")
+def get_market_summary():
+    indexes = [
+        {"name": "코스피", "symbol": "^KS11"},
+        {"name": "코스닥", "symbol": "^KQ11"},
+        {"name": "S&P500", "symbol": "^GSPC"},
+        {"name": "나스닥", "symbol": "^IXIC"},
+        {"name": "다우존스", "symbol": "^DJI"},
+        {"name": "미국 반도체 지수", "symbol": "^SOX"},
+        {"name": "원/달러 환율", "symbol": "KRW=X"},
+    ]
+
+    results = []
+
+    for item in indexes:
+        data = fetch_yahoo_index(item["symbol"])
+
+        if data:
+            results.append({
+                "name": item["name"],
+                "symbol": item["symbol"],
+                **data,
+            })
+
+    up_count = len([x for x in results if x["is_up"]])
+    down_count = len([x for x in results if not x["is_up"]])
+
+    if down_count > up_count:
+        mood = "약세"
+        summary = "주요 지수들이 전반적으로 하락하면서 시장 분위기는 약세에 가깝습니다."
+    elif up_count > down_count:
+        mood = "강세"
+        summary = "주요 지수들이 전반적으로 상승하면서 시장 분위기는 강세에 가깝습니다."
+    else:
+        mood = "혼조"
+        summary = "상승 지수와 하락 지수가 섞여 있어 시장은 혼조세입니다."
+
+    return {
+        "market_mood": mood,
+        "summary": summary,
+        "data": results,
+    }
