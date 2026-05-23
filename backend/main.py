@@ -463,3 +463,70 @@ def get_market_summary():
         "summary": summary,
         "data": results,
     }
+@app.get("/api/stock-quote")
+def get_stock_quote(symbol: str = Query(...), market: str = Query("KR")):
+    candidates = []
+
+    if market == "KR":
+        candidates = [f"{symbol}.KS", f"{symbol}.KQ"]
+    else:
+        candidates = [symbol]
+
+    for yahoo_symbol in candidates:
+        try:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}?range=2d&interval=1d"
+
+            res = requests.get(url, headers=HEADERS, timeout=10)
+            data = res.json()
+
+            result = data["chart"]["result"][0]
+            meta = result["meta"]
+
+            current = meta.get("regularMarketPrice", 0)
+            previous = meta.get("chartPreviousClose", 0)
+
+            if not current or not previous:
+                continue
+
+            diff = current - previous
+            percent = (diff / previous) * 100
+
+            if market == "KR":
+                price_text = f"₩{round(current):,}"
+                base_text = f"₩{round(previous):,}"
+                diff_text = f"{'+' if diff >= 0 else '-'}₩{abs(round(diff)):,}"
+                usd_text = "KRW"
+            else:
+                price_text = f"${current:,.2f}"
+                base_text = f"${previous:,.2f}"
+                diff_text = f"{'+' if diff >= 0 else '-'}${abs(diff):,.2f}"
+                usd_text = f"${current:,.2f}"
+
+            return {
+                "symbol": symbol,
+                "market": market,
+                "price": price_text,
+                "usd": usd_text,
+                "base_price_text": base_text,
+                "diff_from_base": diff_text,
+                "percent_from_base": f"{'+' if percent >= 0 else ''}{percent:.2f}%",
+                "is_up": diff >= 0,
+                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "status": 200,
+            }
+
+        except Exception as e:
+            print("검색 종목 가격 오류:", yahoo_symbol, e)
+
+    return {
+        "symbol": symbol,
+        "market": market,
+        "price": "데이터 없음",
+        "usd": "",
+        "base_price_text": "데이터 없음",
+        "diff_from_base": "계산 불가",
+        "percent_from_base": "0.00%",
+        "is_up": False,
+        "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "status": 404,
+    }
