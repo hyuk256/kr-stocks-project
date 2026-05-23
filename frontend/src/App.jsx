@@ -144,13 +144,26 @@ function App() {
   const selectedStock =
     stocks.find((stock) => stock.symbol === selectedSymbol) || stocks[0] || null;
 
-  const handleStockClick = (stock) => {
-    const tradingViewSymbolMap = {
-      SMSN: "KRX:005930",
-      SKHX: "KRX:000660",
-      HYUNDAI: "KRX:005380",
-    };
+  const tradingViewSymbolMap = {
+    SMSN: "KRX:005930",
+    SKHX: "KRX:000660",
+    HYUNDAI: "KRX:005380",
+    KIA: "KRX:000270",
+    NAVER: "KRX:035420",
+    KAKAO: "KRX:035720",
+    LGES: "KRX:373220",
+    "SAMSUNG BIO": "KRX:207940",
 
+    AAPL: "NASDAQ:AAPL",
+    TSLA: "NASDAQ:TSLA",
+    NVDA: "NASDAQ:NVDA",
+    MSFT: "NASDAQ:MSFT",
+    AMZN: "NASDAQ:AMZN",
+    META: "NASDAQ:META",
+    GOOGL: "NASDAQ:GOOGL",
+  };
+
+  const handleStockClick = (stock) => {
     setSelectedSymbol(stock.symbol);
 
     setSelectedChart({
@@ -171,12 +184,7 @@ function App() {
     (selectedStock && {
       name: selectedStock.name,
       symbol: selectedStock.symbol,
-      tvSymbol:
-        selectedStock.symbol === "SKHX"
-          ? "KRX:000660"
-          : selectedStock.symbol === "HYUNDAI"
-          ? "KRX:005380"
-          : "KRX:005930",
+      tvSymbol: tradingViewSymbolMap[selectedStock.symbol] || "KRX:005930",
       price: selectedStock.price,
       usd: selectedStock.usd,
       percent: selectedStock.percent_from_base,
