@@ -64,6 +64,16 @@ function App() {
     }
   };
 
+  const fetchMarketSummary = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/market-summary`);
+      const data = await res.json();
+      setMarketSummary(data);
+    } catch (err) {
+      console.error("시장 분석 불러오기 오류:", err);
+    }
+  };
+
   const searchCharts = async (keyword) => {
     setChartSearch(keyword);
 
@@ -90,15 +100,18 @@ function App() {
     fetchStocks();
     fetchIssues();
     fetchWatchlist();
+    fetchMarketSummary();
 
     const stockInterval = setInterval(fetchStocks, 30000);
     const issueInterval = setInterval(fetchIssues, 300000);
     const watchlistInterval = setInterval(fetchWatchlist, 300000);
+    const marketInterval = setInterval(fetchMarketSummary, 300000);
 
     return () => {
       clearInterval(stockInterval);
       clearInterval(issueInterval);
       clearInterval(watchlistInterval);
+      clearInterval(marketInterval);
     };
   }, [isUnlocked]);
 
@@ -383,17 +396,85 @@ function App() {
     </div>
   );
 
-  const renderAnalysis = () => (
-    <div style={styles.panel}>
-      <h2>분석 요약</h2>
-      {stocks.map((stock) => (
-        <p key={stock.symbol}>
-          {stock.name}: 최근 종가 대비 {stock.percent_from_base} /{" "}
-          {stock.diff_from_base}
-        </p>
-      ))}
-    </div>
-  );
+  const renderAnalysis = () => {
+    if (!marketSummary) {
+      return (
+        <div style={styles.panel}>
+          <h2>시장 분석</h2>
+          <p>시장 분석 데이터를 불러오는 중입니다...</p>
+        </div>
+      );
+    }
+
+    return (
+      <div style={styles.panel}>
+        <h2 style={{ marginBottom: "25px" }}>📊 시장 종합 분석</h2>
+
+        <div
+          style={{
+            background: "#111827",
+            padding: "25px",
+            borderRadius: "20px",
+            marginBottom: "30px",
+            lineHeight: "38px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "30px",
+              fontWeight: "bold",
+              color:
+                marketSummary.market_mood === "강세"
+                  ? "#00ff99"
+                  : "#ff4d6d",
+              marginBottom: "15px",
+            }}
+          >
+            현재 시장 분위기: {marketSummary.market_mood}
+          </div>
+
+          <div style={{ color: "#cbd5e1", fontSize: "20px" }}>
+            {marketSummary.summary}
+          </div>
+        </div>
+
+        <div style={styles.issueContainer}>
+          {marketSummary.data?.map((item, index) => (
+            <div key={index} style={styles.issueCard}>
+              <div style={styles.issueSource}>{item.symbol}</div>
+
+              <div style={styles.issueTitle}>{item.name}</div>
+
+              <div
+                style={{
+                  fontSize: "34px",
+                  fontWeight: "bold",
+                  marginBottom: "15px",
+                }}
+              >
+                {item.price}
+              </div>
+
+              <div
+                style={{
+                  color: item.is_up ? "#00ff99" : "#ff4d6d",
+                  fontSize: "28px",
+                  fontWeight: "bold",
+                  marginBottom: "15px",
+                }}
+              >
+                {item.percent}%
+              </div>
+
+              <div style={styles.issueTime}>
+                전일 대비: {item.diff}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   const renderContent = () => {
     if (activeTab === "주식") return renderStocks();
