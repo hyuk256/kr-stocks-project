@@ -18,9 +18,23 @@ app.add_middleware(
 )
 
 STOCKS = [
-    {"name": "삼성전자", "symbol": "SMSN", "path": "korea/samsung", "krx_code": "005930"},
-    {"name": "SK하이닉스", "symbol": "SKHX", "path": "korea/hynix", "krx_code": "000660"},
-    {"name": "현대차", "symbol": "HYUNDAI", "path": "korea/hyundai", "krx_code": "005380"},
+    {"name": "삼성전자", "symbol": "SMSN", "market": "KR", "path": "korea/samsung", "krx_code": "005930", "yahoo": "005930.KS"},
+    {"name": "SK하이닉스", "symbol": "SKHX", "market": "KR", "path": "korea/hynix", "krx_code": "000660", "yahoo": "000660.KS"},
+    {"name": "현대차", "symbol": "HYUNDAI", "market": "KR", "path": "korea/hyundai", "krx_code": "005380", "yahoo": "005380.KS"},
+
+    {"name": "기아", "symbol": "KIA", "market": "KR", "yahoo": "000270.KS"},
+    {"name": "NAVER", "symbol": "NAVER", "market": "KR", "yahoo": "035420.KS"},
+    {"name": "카카오", "symbol": "KAKAO", "market": "KR", "yahoo": "035720.KS"},
+    {"name": "LG에너지솔루션", "symbol": "LGES", "market": "KR", "yahoo": "373220.KS"},
+    {"name": "삼성바이오로직스", "symbol": "SAMSUNG BIO", "market": "KR", "yahoo": "207940.KS"},
+
+    {"name": "Apple", "symbol": "AAPL", "market": "US", "yahoo": "AAPL"},
+    {"name": "Tesla", "symbol": "TSLA", "market": "US", "yahoo": "TSLA"},
+    {"name": "NVIDIA", "symbol": "NVDA", "market": "US", "yahoo": "NVDA"},
+    {"name": "Microsoft", "symbol": "MSFT", "market": "US", "yahoo": "MSFT"},
+    {"name": "Amazon", "symbol": "AMZN", "market": "US", "yahoo": "AMZN"},
+    {"name": "Meta", "symbol": "META", "market": "US", "yahoo": "META"},
+    {"name": "Google", "symbol": "GOOGL", "market": "US", "yahoo": "GOOGL"},
 ]
 
 CACHE = {"last_update": 0, "data": []}
@@ -34,8 +48,10 @@ HEADERS = {
     "Accept": "*/*",
 }
 
+
 def clean_number(value):
     return float(value.replace("$", "").replace("₩", "").replace(",", "").strip())
+
 
 def get_krx_close(code):
     url = f"https://finance.naver.com/item/sise_day.naver?code={code}"
@@ -51,6 +67,7 @@ def get_krx_close(code):
                 return int(close_text)
 
     return 0
+
 
 def extract_usd_and_fx(html):
     text = BeautifulSoup(html, "html.parser").get_text(" ", strip=True)
@@ -69,70 +86,116 @@ def extract_usd_and_fx(html):
     usd_price = usd_prices[0] if usd_prices else "데이터 없음"
     return usd_price, fx_rate
 
+
+def fetch_yahoo_stock(stock):
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{stock['yahoo']}?range=2d&interval=1d"
+
+    try:
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        data = res.json()
+
+        result = data["chart"]["result"][0]
+        meta = result["meta"]
+
+        current = meta.get("regularMarketPrice", 0)
+        previous = meta.get("chartPreviousClose", 0)
+
+        if not current or not previous:
+            raise Exception("가격 데이터 없음")
+
+        diff = current - previous
+        percent = (diff / previous) * 100
+
+        if stock["market"] == "KR":
+            price_text = f"₩{round(current):,}"
+            base_text = f"₩{round(previous):,}"
+            usd_text = "KRW"
+            diff_text = f"{'+' if diff >= 0 else '-'}₩{abs(round(diff)):,}"
+        else:
+            price_text = f"${current:,.2f}"
+            base_text = f"${previous:,.2f}"
+            usd_text = f"${current:,.2f}"
+            diff_text = f"{'+' if diff >= 0 else '-'}${abs(diff):,.2f}"
+
+        return {
+            "name": stock["name"],
+            "symbol": stock["symbol"],
+            "market": stock["market"],
+            "price": price_text,
+            "price_number": round(current, 2),
+            "usd": usd_text,
+            "fx_rate": 0,
+            "base_price": round(previous, 2),
+            "base_price_text": base_text,
+            "diff_from_base": diff_text,
+            "percent_from_base": f"{'+' if percent >= 0 else ''}{percent:.2f}%",
+            "is_up": diff >= 0,
+            "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "source": url,
+            "status": res.status_code,
+        }
+
+    except Exception as e:
+        return {
+            "name": stock["name"],
+            "symbol": stock["symbol"],
+            "market": stock["market"],
+            "price": "데이터 없음",
+            "usd": "데이터 없음",
+            "fx_rate": 0,
+            "base_price_text": "데이터 없음",
+            "diff_from_base": "계산 불가",
+            "percent_from_base": "0.00%",
+            "is_up": False,
+            "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "source": str(e),
+        }
+
+
 def fetch_stock_data():
     results = []
 
     for stock in STOCKS:
-        url = f"https://kr-stocks.com/{stock['path']}"
+        if stock.get("path") and stock.get("krx_code"):
+            url = f"https://kr-stocks.com/{stock['path']}"
 
-        try:
-            response = requests.get(url, headers=HEADERS, timeout=10)
-            usd_price, fx_rate = extract_usd_and_fx(response.text)
-            krx_close = get_krx_close(stock["krx_code"])
+            try:
+                response = requests.get(url, headers=HEADERS, timeout=10)
+                usd_price, fx_rate = extract_usd_and_fx(response.text)
+                krx_close = get_krx_close(stock["krx_code"])
 
-            if usd_price != "데이터 없음" and krx_close > 0:
-                current_price = round(clean_number(usd_price) * fx_rate)
-                diff = current_price - krx_close
-                percent = (diff / krx_close) * 100
+                if usd_price != "데이터 없음" and krx_close > 0:
+                    current_price = round(clean_number(usd_price) * fx_rate)
+                    diff = current_price - krx_close
+                    percent = (diff / krx_close) * 100
 
-                results.append({
-                    "name": stock["name"],
-                    "symbol": stock["symbol"],
-                    "price": f"₩{current_price:,}",
-                    "price_number": current_price,
-                    "usd": usd_price,
-                    "fx_rate": fx_rate,
-                    "base_price": krx_close,
-                    "base_price_text": f"₩{krx_close:,}",
-                    "diff_from_base": f"{'+' if diff >= 0 else '-'}₩{abs(diff):,}",
-                    "percent_from_base": f"{'+' if percent >= 0 else ''}{percent:.2f}%",
-                    "is_up": diff >= 0,
-                    "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "source": url,
-                    "status": response.status_code,
-                })
-            else:
-                results.append({
-                    "name": stock["name"],
-                    "symbol": stock["symbol"],
-                    "price": "데이터 없음",
-                    "usd": usd_price,
-                    "fx_rate": fx_rate,
-                    "base_price_text": "종가 없음",
-                    "diff_from_base": "계산 불가",
-                    "percent_from_base": "0.00%",
-                    "is_up": False,
-                    "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "source": url,
-                    "status": response.status_code,
-                })
+                    results.append({
+                        "name": stock["name"],
+                        "symbol": stock["symbol"],
+                        "market": stock["market"],
+                        "price": f"₩{current_price:,}",
+                        "price_number": current_price,
+                        "usd": usd_price,
+                        "fx_rate": fx_rate,
+                        "base_price": krx_close,
+                        "base_price_text": f"₩{krx_close:,}",
+                        "diff_from_base": f"{'+' if diff >= 0 else '-'}₩{abs(diff):,}",
+                        "percent_from_base": f"{'+' if percent >= 0 else ''}{percent:.2f}%",
+                        "is_up": diff >= 0,
+                        "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "source": url,
+                        "status": response.status_code,
+                    })
+                else:
+                    results.append(fetch_yahoo_stock(stock))
 
-        except Exception as e:
-            results.append({
-                "name": stock["name"],
-                "symbol": stock["symbol"],
-                "price": "오류",
-                "usd": "오류",
-                "fx_rate": 0,
-                "base_price_text": "오류",
-                "diff_from_base": "오류",
-                "percent_from_base": "0.00%",
-                "is_up": False,
-                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "source": str(e),
-            })
+            except Exception:
+                results.append(fetch_yahoo_stock(stock))
+        else:
+            results.append(fetch_yahoo_stock(stock))
 
     return results
+
 
 def load_krx_symbols():
     file_path = os.path.join(os.path.dirname(__file__), "krx_symbols.json")
@@ -143,6 +206,7 @@ def load_krx_symbols():
     except Exception as e:
         print("krx_symbols.json 불러오기 오류:", e)
         return []
+
 
 def fetch_news():
     rss_urls = [
@@ -183,6 +247,7 @@ def fetch_news():
 
     return unique_news[:60]
 
+
 @app.get("/api/stocks")
 def get_stocks():
     now = time.time()
@@ -197,6 +262,7 @@ def get_stocks():
         "data": CACHE["data"],
     }
 
+
 @app.get("/api/force-update")
 def force_update():
     CACHE["data"] = fetch_stock_data()
@@ -206,6 +272,7 @@ def force_update():
         "message": "강제 업데이트 완료",
         "data": CACHE["data"],
     }
+
 
 @app.get("/api/issues")
 def get_issues():
@@ -220,6 +287,7 @@ def get_issues():
         "last_update": NEWS_CACHE["last_update"],
         "data": NEWS_CACHE["data"],
     }
+
 
 @app.get("/api/watchlist")
 def get_watchlist():
@@ -264,6 +332,7 @@ def get_watchlist():
         "standard": "뉴스 언급량 기준 TOP 10",
         "data": ranked[:10],
     }
+
 
 @app.get("/api/search-symbols")
 def search_symbols(q: str = Query(...)):
@@ -319,6 +388,7 @@ def search_symbols(q: str = Query(...)):
 
     return {"results": results[:50]}
 
+
 def fetch_yahoo_index(symbol):
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=2d&interval=1d"
 
@@ -349,6 +419,7 @@ def fetch_yahoo_index(symbol):
     except Exception as e:
         print("지수 데이터 오류:", symbol, e)
         return None
+
 
 @app.get("/api/market-summary")
 def get_market_summary():
