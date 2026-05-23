@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 
 function App() {
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const SITE_PASSWORD = "kr1234";
+
   const [stocks, setStocks] = useState([]);
   const [activeTab, setActiveTab] = useState("주식");
   const [selectedSymbol, setSelectedSymbol] = useState(null);
@@ -14,9 +18,19 @@ function App() {
 
   const tabs = ["주식", "차트", "분석", "이슈", "관심종목"];
 
+  const API_BASE = "https://kr-stocks-backend.onrender.com";
+
+  const handleLogin = () => {
+    if (passwordInput === SITE_PASSWORD) {
+      setIsUnlocked(true);
+    } else {
+      alert("비밀번호가 틀렸습니다.");
+    }
+  };
+
   const fetchStocks = async () => {
     try {
-      const res = await fetch("https://kr-stocks-backend.onrender.com/api/stocks");
+      const res = await fetch(`${API_BASE}/api/stocks`);
       const data = await res.json();
 
       const newStocks = data.data || [];
@@ -30,7 +44,7 @@ function App() {
 
   const fetchIssues = async () => {
     try {
-      const res = await fetch("https://kr-stocks-backend.onrender.com/api/issues");
+      const res = await fetch(`${API_BASE}/api/issues`);
       const data = await res.json();
       setIssues(data.data || []);
     } catch (err) {
@@ -40,7 +54,7 @@ function App() {
 
   const fetchWatchlist = async () => {
     try {
-      const res = await fetch("https://kr-stocks-backend.onrender.com/api/watchlist");
+      const res = await fetch(`${API_BASE}/api/watchlist`);
       const data = await res.json();
       setWatchlist(data.data || []);
     } catch (err) {
@@ -58,7 +72,7 @@ function App() {
 
     try {
       const res = await fetch(
-        `https://kr-stocks-backend.onrender.com/api/search-symbols?q=${encodeURIComponent(keyword)}`
+        `${API_BASE}/api/search-symbols?q=${encodeURIComponent(keyword)}`
       );
 
       const data = await res.json();
@@ -69,6 +83,8 @@ function App() {
   };
 
   useEffect(() => {
+    if (!isUnlocked) return;
+
     fetchStocks();
     fetchIssues();
     fetchWatchlist();
@@ -82,7 +98,33 @@ function App() {
       clearInterval(issueInterval);
       clearInterval(watchlistInterval);
     };
-  }, []);
+  }, [isUnlocked]);
+
+  if (!isUnlocked) {
+    return (
+      <div style={styles.lockPage}>
+        <div style={styles.lockBox}>
+          <h1 style={styles.lockTitle}>KR Stocks</h1>
+          <p style={styles.lockText}>비밀번호를 입력하세요</p>
+
+          <input
+            style={styles.lockInput}
+            type="password"
+            placeholder="비밀번호"
+            value={passwordInput}
+            onChange={(e) => setPasswordInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleLogin();
+            }}
+          />
+
+          <button style={styles.lockButton} onClick={handleLogin}>
+            입장하기
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const selectedStock =
     stocks.find((stock) => stock.symbol === selectedSymbol) || stocks[0] || null;
@@ -397,6 +439,57 @@ function App() {
 }
 
 const styles = {
+  lockPage: {
+    backgroundColor: "#020b24",
+    minHeight: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    color: "white",
+    fontFamily: "Arial",
+  },
+
+  lockBox: {
+    background: "#08142f",
+    padding: "45px",
+    borderRadius: "28px",
+    width: "360px",
+    textAlign: "center",
+    boxShadow: "0 0 25px rgba(0,0,0,0.4)",
+  },
+
+  lockTitle: {
+    fontSize: "42px",
+    marginBottom: "12px",
+  },
+
+  lockText: {
+    color: "#94a3b8",
+    marginBottom: "25px",
+  },
+
+  lockInput: {
+    width: "100%",
+    padding: "16px",
+    borderRadius: "14px",
+    border: "none",
+    fontSize: "18px",
+    marginBottom: "18px",
+    boxSizing: "border-box",
+  },
+
+  lockButton: {
+    width: "100%",
+    padding: "16px",
+    borderRadius: "14px",
+    border: "none",
+    background: "#2563eb",
+    color: "white",
+    fontSize: "18px",
+    fontWeight: "bold",
+    cursor: "pointer",
+  },
+
   page: {
     backgroundColor: "#020b24",
     minHeight: "100vh",
@@ -404,6 +497,7 @@ const styles = {
     color: "white",
     fontFamily: "Arial",
   },
+
   header: {
     display: "flex",
     justifyContent: "space-between",
@@ -412,20 +506,24 @@ const styles = {
     marginBottom: "30px",
     flexWrap: "wrap",
   },
+
   title: {
     fontSize: "58px",
     margin: 0,
   },
+
   subtitle: {
     color: "#94a3b8",
     fontSize: "20px",
     marginTop: "8px",
   },
+
   tabs: {
     display: "flex",
     gap: "12px",
     flexWrap: "wrap",
   },
+
   tabButton: {
     border: "none",
     color: "white",
@@ -435,6 +533,7 @@ const styles = {
     fontWeight: "bold",
     cursor: "pointer",
   },
+
   topInfo: {
     background: "#081028",
     padding: "20px",
@@ -444,11 +543,13 @@ const styles = {
     textAlign: "center",
     lineHeight: "34px",
   },
+
   grid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))",
     gap: "30px",
   },
+
   card: {
     background: "#08142f",
     borderRadius: "30px",
@@ -458,25 +559,30 @@ const styles = {
     textAlign: "center",
     cursor: "pointer",
   },
+
   stockName: {
     fontSize: "40px",
     fontWeight: "bold",
   },
+
   symbol: {
     color: "#94a3b8",
     fontSize: "24px",
     marginTop: "8px",
   },
+
   price: {
     fontSize: "54px",
     fontWeight: "bold",
     marginTop: "25px",
   },
+
   usd: {
     color: "#7dd3fc",
     fontSize: "30px",
     marginTop: "10px",
   },
+
   statusDot: {
     width: "18px",
     height: "18px",
@@ -485,6 +591,7 @@ const styles = {
     top: "25px",
     right: "25px",
   },
+
   bottomRow: {
     marginTop: "25px",
     display: "flex",
@@ -492,11 +599,13 @@ const styles = {
     color: "#94a3b8",
     fontSize: "14px",
   },
+
   clickHint: {
     marginTop: "20px",
     color: "#60a5fa",
     fontSize: "15px",
   },
+
   panel: {
     background: "#08142f",
     borderRadius: "30px",
@@ -504,14 +613,17 @@ const styles = {
     fontSize: "22px",
     lineHeight: "38px",
   },
+
   chartContainer: {
     background: "#08142f",
     borderRadius: "30px",
     padding: "40px",
   },
+
   searchBox: {
     marginBottom: "25px",
   },
+
   searchInput: {
     width: "100%",
     padding: "18px",
@@ -519,12 +631,14 @@ const styles = {
     border: "none",
     fontSize: "18px",
   },
+
   searchResults: {
     display: "flex",
     flexWrap: "wrap",
     gap: "10px",
     marginTop: "15px",
   },
+
   resultButton: {
     background: "#111827",
     color: "white",
@@ -535,25 +649,30 @@ const styles = {
     fontSize: "15px",
     textAlign: "left",
   },
+
   chartHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: "25px",
   },
+
   chartTitle: {
     fontSize: "46px",
     margin: 0,
   },
+
   chartSymbol: {
     color: "#94a3b8",
     marginTop: "8px",
     fontSize: "22px",
   },
+
   chartPrice: {
     fontSize: "52px",
     fontWeight: "bold",
   },
+
   openChartButton: {
     background: "#2563eb",
     color: "white",
@@ -565,6 +684,7 @@ const styles = {
     cursor: "pointer",
     marginBottom: "20px",
   },
+
   tvChartWrapper: {
     width: "100%",
     height: "650px",
@@ -572,15 +692,18 @@ const styles = {
     overflow: "hidden",
     backgroundColor: "#000",
   },
+
   chartInfo: {
     marginTop: "25px",
     display: "flex",
     justifyContent: "space-between",
     fontSize: "24px",
   },
+
   issueSearchBox: {
     marginBottom: "25px",
   },
+
   issueSearchInput: {
     width: "100%",
     padding: "18px",
@@ -588,34 +711,40 @@ const styles = {
     border: "none",
     fontSize: "18px",
   },
+
   issueContainer: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
     gap: "25px",
   },
+
   issueCard: {
     background: "#08142f",
     borderRadius: "24px",
     padding: "25px",
     boxShadow: "0 0 20px rgba(0,0,0,0.35)",
   },
+
   issueSource: {
     color: "#60a5fa",
     fontSize: "15px",
     marginBottom: "12px",
     fontWeight: "bold",
   },
+
   issueTitle: {
     fontSize: "21px",
     fontWeight: "bold",
     lineHeight: "32px",
     marginBottom: "14px",
   },
+
   issueTime: {
     color: "#94a3b8",
     fontSize: "14px",
     marginBottom: "18px",
   },
+
   issueButton: {
     background: "#2563eb",
     color: "white",
