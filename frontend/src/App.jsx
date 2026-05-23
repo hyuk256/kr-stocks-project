@@ -16,7 +16,7 @@ function App() {
 
   const fetchStocks = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/stocks");
+      const res = await fetch("https://kr-stocks-backend.onrender.com/api/stocks");
       const data = await res.json();
 
       const newStocks = data.data || [];
@@ -30,7 +30,7 @@ function App() {
 
   const fetchIssues = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/issues");
+      const res = await fetch("https://kr-stocks-backend.onrender.com/api/issues");
       const data = await res.json();
       setIssues(data.data || []);
     } catch (err) {
@@ -40,7 +40,7 @@ function App() {
 
   const fetchWatchlist = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/watchlist");
+      const res = await fetch("https://kr-stocks-backend.onrender.com/api/watchlist");
       const data = await res.json();
       setWatchlist(data.data || []);
     } catch (err) {
@@ -58,7 +58,7 @@ function App() {
 
     try {
       const res = await fetch(
-        `http://127.0.0.1:8000/api/search-symbols?q=${encodeURIComponent(keyword)}`
+        `https://kr-stocks-backend.onrender.com/api/search-symbols?q=${encodeURIComponent(keyword)}`
       );
 
       const data = await res.json();
