@@ -8,6 +8,8 @@ function App() {
   const [stocks, setStocks] = useState([]);
   const [activeTab, setActiveTab] = useState("주식");
   const [stockMarketTab, setStockMarketTab] = useState("KR");
+  const [stockSearch, setStockSearch] = useState("");
+  const [stockSearchResults, setStockSearchResults] = useState([]);
   const [selectedSymbol, setSelectedSymbol] = useState(null);
   const [selectedChart, setSelectedChart] = useState(null);
   const [chartSearch, setChartSearch] = useState("");
@@ -72,6 +74,36 @@ function App() {
       setMarketSummary(data);
     } catch (err) {
       console.error("시장 분석 불러오기 오류:", err);
+    }
+  };
+
+  const searchStockCards = async (keyword) => {
+    setStockSearch(keyword);
+
+    if (!keyword.trim()) {
+      setStockSearchResults([]);
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/search-symbols?q=${encodeURIComponent(keyword)}`
+      );
+
+      const data = await res.json();
+      const results = data.results || [];
+
+      const filteredResults = results.filter((item) => {
+        if (stockMarketTab === "KR") {
+          return item.exchange === "KRX" || item.tvSymbol?.startsWith("KRX:");
+        }
+
+        return item.exchange !== "KRX" && !item.tvSymbol?.startsWith("KRX:");
+      });
+
+      setStockSearchResults(filteredResults);
+    } catch (err) {
+      console.error("주식 검색 오류:", err);
     }
   };
 
@@ -170,11 +202,11 @@ function App() {
     setSelectedChart({
       name: stock.name,
       symbol: stock.symbol,
-      tvSymbol: tradingViewSymbolMap[stock.symbol] || "KRX:005930",
-      price: stock.price,
-      usd: stock.usd,
-      percent: stock.percent_from_base,
-      isUp: stock.is_up,
+      tvSymbol: stock.tvSymbol || tradingViewSymbolMap[stock.symbol] || "KRX:005930",
+      price: stock.price || "",
+      usd: stock.usd || "",
+      percent: stock.percent_from_base || "",
+      isUp: stock.is_up ?? true,
     });
 
     setActiveTab("차트");
@@ -204,14 +236,91 @@ function App() {
     );
   });
 
+  const renderStockCard = (stock, index) => (
+    <div key={`${stock.symbol}-${index}`} style={styles.card} onClick={() => handleStockClick(stock)}>
+      <div
+        style={{
+          ...styles.statusDot,
+          backgroundColor: stock.is_up ? "#00ff88" : "#ff4d6d",
+        }}
+      />
+
+      <div style={styles.stockName}>{stock.name}</div>
+      <div style={styles.symbol}>{stock.symbol}</div>
+      <div style={styles.price}>{stock.price || "차트 검색 종목"}</div>
+      <div style={styles.usd}>{stock.usd || stock.tvSymbol || ""}</div>
+
+      <div
+        style={{
+          color: stock.is_up ? "#00ff99" : "#ff4d6d",
+          fontWeight: "bold",
+          fontSize: "28px",
+          marginTop: "10px",
+        }}
+      >
+        {stock.percent_from_base || "차트 확인 가능"}
+      </div>
+
+      <div
+        style={{
+          color: stock.is_up ? "#00ff99" : "#ff4d6d",
+          marginTop: "10px",
+          fontSize: "16px",
+        }}
+      >
+        {stock.diff_from_base
+          ? `최근 종가 대비 ${stock.diff_from_base}`
+          : "클릭하면 해당 종목 차트로 이동"}
+      </div>
+
+      <div style={styles.bottomRow}>
+        <span>최근 종가: {stock.base_price_text || "검색 결과"}</span>
+        <span>{stock.updated_at || ""}</span>
+      </div>
+
+      <div style={styles.clickHint}>탭하여 차트 확인하기 →</div>
+    </div>
+  );
+
   const renderStocks = () => {
     const filteredStocks = stocks.filter((stock) => stock.market === stockMarketTab);
+
+    const displayStocks = stockSearch.trim()
+      ? stockSearchResults.map((item) => {
+          const matchedStock = stocks.find((stock) => stock.symbol === item.symbol);
+
+          if (matchedStock) {
+            return {
+              ...matchedStock,
+              tvSymbol: item.tvSymbol || tradingViewSymbolMap[matchedStock.symbol],
+            };
+          }
+
+          return {
+            name: item.name,
+            symbol: item.symbol,
+            market: stockMarketTab,
+            tvSymbol: item.tvSymbol,
+            price: "",
+            usd: item.tvSymbol,
+            percent_from_base: "",
+            diff_from_base: "",
+            base_price_text: "",
+            is_up: true,
+            updated_at: "",
+          };
+        })
+      : filteredStocks;
 
     return (
       <div>
         <div style={styles.stockInnerTabs}>
           <button
-            onClick={() => setStockMarketTab("KR")}
+            onClick={() => {
+              setStockMarketTab("KR");
+              setStockSearch("");
+              setStockSearchResults([]);
+            }}
             style={{
               ...styles.stockInnerTabButton,
               backgroundColor: stockMarketTab === "KR" ? "#2563eb" : "#111827",
@@ -221,7 +330,11 @@ function App() {
           </button>
 
           <button
-            onClick={() => setStockMarketTab("US")}
+            onClick={() => {
+              setStockMarketTab("US");
+              setStockSearch("");
+              setStockSearchResults([]);
+            }}
             style={{
               ...styles.stockInnerTabButton,
               backgroundColor: stockMarketTab === "US" ? "#2563eb" : "#111827",
@@ -231,50 +344,21 @@ function App() {
           </button>
         </div>
 
+        <div style={styles.stockSearchBox}>
+          <input
+            style={styles.stockSearchInput}
+            placeholder={
+              stockMarketTab === "KR"
+                ? "한국 주식 검색: 삼성전자, 카카오, 네이버, 005930..."
+                : "미국 주식 검색: Apple, Tesla, NVIDIA, AAPL..."
+            }
+            value={stockSearch}
+            onChange={(e) => searchStockCards(e.target.value)}
+          />
+        </div>
+
         <div style={styles.grid}>
-          {filteredStocks.map((stock, index) => (
-            <div key={index} style={styles.card} onClick={() => handleStockClick(stock)}>
-              <div
-                style={{
-                  ...styles.statusDot,
-                  backgroundColor: stock.is_up ? "#00ff88" : "#ff4d6d",
-                }}
-              />
-
-              <div style={styles.stockName}>{stock.name}</div>
-              <div style={styles.symbol}>{stock.symbol}</div>
-              <div style={styles.price}>{stock.price}</div>
-              <div style={styles.usd}>{stock.usd}</div>
-
-              <div
-                style={{
-                  color: stock.is_up ? "#00ff99" : "#ff4d6d",
-                  fontWeight: "bold",
-                  fontSize: "28px",
-                  marginTop: "10px",
-                }}
-              >
-                {stock.percent_from_base}
-              </div>
-
-              <div
-                style={{
-                  color: stock.is_up ? "#00ff99" : "#ff4d6d",
-                  marginTop: "10px",
-                  fontSize: "16px",
-                }}
-              >
-                최근 종가 대비 {stock.diff_from_base}
-              </div>
-
-              <div style={styles.bottomRow}>
-                <span>최근 종가: {stock.base_price_text}</span>
-                <span>{stock.updated_at}</span>
-              </div>
-
-              <div style={styles.clickHint}>탭하여 차트 확인하기 →</div>
-            </div>
-          ))}
+          {displayStocks.map((stock, index) => renderStockCard(stock, index))}
         </div>
       </div>
     );
@@ -656,7 +740,7 @@ const styles = {
     display: "flex",
     justifyContent: "center",
     gap: "15px",
-    marginBottom: "30px",
+    marginBottom: "20px",
   },
 
   stockInnerTabButton: {
@@ -667,6 +751,19 @@ const styles = {
     fontSize: "18px",
     fontWeight: "bold",
     cursor: "pointer",
+  },
+
+  stockSearchBox: {
+    marginBottom: "30px",
+  },
+
+  stockSearchInput: {
+    width: "100%",
+    padding: "18px",
+    borderRadius: "16px",
+    border: "none",
+    fontSize: "18px",
+    boxSizing: "border-box",
   },
 
   topInfo: {
