@@ -7,6 +7,7 @@ function App() {
 
   const [stocks, setStocks] = useState([]);
   const [activeTab, setActiveTab] = useState("주식");
+  const [stockMarketTab, setStockMarketTab] = useState("KR");
   const [selectedSymbol, setSelectedSymbol] = useState(null);
   const [selectedChart, setSelectedChart] = useState(null);
   const [chartSearch, setChartSearch] = useState("");
@@ -17,7 +18,7 @@ function App() {
   const [time, setTime] = useState("");
 
   const [marketSummary, setMarketSummary] = useState(null);
-  
+
   const tabs = ["주식", "차트", "분석", "이슈", "관심종목"];
 
   const API_BASE = "https://kr-stocks-backend.onrender.com";
@@ -203,53 +204,81 @@ function App() {
     );
   });
 
-  const renderStocks = () => (
-    <div style={styles.grid}>
-      {stocks.map((stock, index) => (
-        <div key={index} style={styles.card} onClick={() => handleStockClick(stock)}>
-          <div
-            style={{
-              ...styles.statusDot,
-              backgroundColor: stock.is_up ? "#00ff88" : "#ff4d6d",
-            }}
-          />
+  const renderStocks = () => {
+    const filteredStocks = stocks.filter((stock) => stock.market === stockMarketTab);
 
-          <div style={styles.stockName}>{stock.name}</div>
-          <div style={styles.symbol}>{stock.symbol}</div>
-          <div style={styles.price}>{stock.price}</div>
-          <div style={styles.usd}>{stock.usd}</div>
-
-          <div
+    return (
+      <div>
+        <div style={styles.stockInnerTabs}>
+          <button
+            onClick={() => setStockMarketTab("KR")}
             style={{
-              color: stock.is_up ? "#00ff99" : "#ff4d6d",
-              fontWeight: "bold",
-              fontSize: "28px",
-              marginTop: "10px",
+              ...styles.stockInnerTabButton,
+              backgroundColor: stockMarketTab === "KR" ? "#2563eb" : "#111827",
             }}
           >
-            {stock.percent_from_base}
-          </div>
+            한국 주식
+          </button>
 
-          <div
+          <button
+            onClick={() => setStockMarketTab("US")}
             style={{
-              color: stock.is_up ? "#00ff99" : "#ff4d6d",
-              marginTop: "10px",
-              fontSize: "16px",
+              ...styles.stockInnerTabButton,
+              backgroundColor: stockMarketTab === "US" ? "#2563eb" : "#111827",
             }}
           >
-            최근 종가 대비 {stock.diff_from_base}
-          </div>
-
-          <div style={styles.bottomRow}>
-            <span>최근 종가: {stock.base_price_text}</span>
-            <span>{stock.updated_at}</span>
-          </div>
-
-          <div style={styles.clickHint}>탭하여 차트 확인하기 →</div>
+            미국 주식
+          </button>
         </div>
-      ))}
-    </div>
-  );
+
+        <div style={styles.grid}>
+          {filteredStocks.map((stock, index) => (
+            <div key={index} style={styles.card} onClick={() => handleStockClick(stock)}>
+              <div
+                style={{
+                  ...styles.statusDot,
+                  backgroundColor: stock.is_up ? "#00ff88" : "#ff4d6d",
+                }}
+              />
+
+              <div style={styles.stockName}>{stock.name}</div>
+              <div style={styles.symbol}>{stock.symbol}</div>
+              <div style={styles.price}>{stock.price}</div>
+              <div style={styles.usd}>{stock.usd}</div>
+
+              <div
+                style={{
+                  color: stock.is_up ? "#00ff99" : "#ff4d6d",
+                  fontWeight: "bold",
+                  fontSize: "28px",
+                  marginTop: "10px",
+                }}
+              >
+                {stock.percent_from_base}
+              </div>
+
+              <div
+                style={{
+                  color: stock.is_up ? "#00ff99" : "#ff4d6d",
+                  marginTop: "10px",
+                  fontSize: "16px",
+                }}
+              >
+                최근 종가 대비 {stock.diff_from_base}
+              </div>
+
+              <div style={styles.bottomRow}>
+                <span>최근 종가: {stock.base_price_text}</span>
+                <span>{stock.updated_at}</span>
+              </div>
+
+              <div style={styles.clickHint}>탭하여 차트 확인하기 →</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   const renderChart = () => {
     if (!currentChart) {
@@ -474,9 +503,7 @@ function App() {
                 {item.percent}%
               </div>
 
-              <div style={styles.issueTime}>
-                전일 대비: {item.diff}
-              </div>
+              <div style={styles.issueTime}>전일 대비: {item.diff}</div>
             </div>
           ))}
         </div>
@@ -620,6 +647,23 @@ const styles = {
     color: "white",
     padding: "16px 24px",
     borderRadius: "16px",
+    fontSize: "18px",
+    fontWeight: "bold",
+    cursor: "pointer",
+  },
+
+  stockInnerTabs: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "15px",
+    marginBottom: "30px",
+  },
+
+  stockInnerTabButton: {
+    border: "none",
+    color: "white",
+    padding: "14px 28px",
+    borderRadius: "15px",
     fontSize: "18px",
     fontWeight: "bold",
     cursor: "pointer",
