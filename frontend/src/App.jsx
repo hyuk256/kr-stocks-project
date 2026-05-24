@@ -23,7 +23,7 @@ function App() {
 
   const tabs = ["주식", "차트", "분석", "이슈", "관심종목"];
 
-  const API_BASE = "https://kr-stocks-backend.onrender.com";
+  const API_BASE = "http://127.0.0.1:8000";
 
   const handleLogin = () => {
     if (passwordInput === SITE_PASSWORD) {
