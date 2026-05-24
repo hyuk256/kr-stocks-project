@@ -87,61 +87,11 @@ function App() {
 
     try {
       const res = await fetch(
-        `${API_BASE}/api/search-symbols?q=${encodeURIComponent(keyword)}`
+        `${API_BASE}/api/search-24h-stocks?q=${encodeURIComponent(keyword)}`
       );
 
       const data = await res.json();
-      const results = data.results || [];
-
-      const filteredResults = results.filter((item) => {
-        if (stockMarketTab === "KR") {
-          return item.exchange === "KRX" || item.tvSymbol?.startsWith("KRX:");
-        }
-
-        return item.exchange !== "KRX" && !item.tvSymbol?.startsWith("KRX:");
-      });
-
-      const enrichedResults = await Promise.all(
-        filteredResults.slice(0, 12).map(async (item) => {
-          const market = item.tvSymbol?.startsWith("KRX:") ? "KR" : "US";
-
-          try {
-            const quoteRes = await fetch(
-              `${API_BASE}/api/stock-quote?symbol=${encodeURIComponent(
-                item.symbol
-              )}&market=${market}`
-            );
-
-            const quote = await quoteRes.json();
-
-            return {
-              ...item,
-              market,
-              price: quote.price,
-              usd: quote.usd || item.tvSymbol,
-              base_price_text: quote.base_price_text,
-              diff_from_base: quote.diff_from_base,
-              percent_from_base: quote.percent_from_base,
-              is_up: quote.is_up,
-              updated_at: quote.updated_at,
-            };
-          } catch (err) {
-            return {
-              ...item,
-              market,
-              price: "데이터 없음",
-              usd: item.tvSymbol,
-              base_price_text: "데이터 없음",
-              diff_from_base: "계산 불가",
-              percent_from_base: "0.00%",
-              is_up: false,
-              updated_at: "",
-            };
-          }
-        })
-      );
-
-      setStockSearchResults(enrichedResults);
+      setStockSearchResults(data.data || []);
     } catch (err) {
       console.error("주식 검색 오류:", err);
     }
@@ -387,8 +337,8 @@ function App() {
             style={styles.stockSearchInput}
             placeholder={
               stockMarketTab === "KR"
-                ? "한국 주식 검색: 삼성전자, 카카오, 네이버, 005930..."
-                : "미국 주식 검색: Apple, Tesla, NVIDIA, AAPL..."
+                ? "24시간 지원 종목 검색: 삼성전자, 하이닉스, 현대차..."
+                : "미국 주식은 다음 단계에서 지원 예정입니다."
             }
             value={stockSearch}
             onChange={(e) => searchStockCards(e.target.value)}
