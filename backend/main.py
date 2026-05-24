@@ -530,3 +530,68 @@ def get_stock_quote(symbol: str = Query(...), market: str = Query("KR")):
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "status": 404,
     }
+@app.get("/api/search-24h-stocks")
+def search_24h_stocks(q: str = Query("")):
+    keyword = q.lower().replace(" ", "")
+
+    supported_stocks = [
+        stock for stock in STOCKS
+        if stock.get("path") and stock.get("krx_code")
+    ]
+
+    results = []
+
+    for stock in supported_stocks:
+        name = stock.get("name", "")
+        symbol = stock.get("symbol", "")
+        krx_code = stock.get("krx_code", "")
+
+        if keyword:
+            if (
+                keyword not in name.lower().replace(" ", "")
+                and keyword not in symbol.lower().replace(" ", "")
+                and keyword not in krx_code.lower().replace(" ", "")
+            ):
+                continue
+
+        url = f"https://kr-stocks.com/{stock['path']}"
+
+        try:
+            response = requests.get(url, headers=HEADERS, timeout=10)
+            usd_price, fx_rate = extract_usd_and_fx(response.text)
+            krx_close = get_krx_close(stock["krx_code"])
+
+            if usd_price != "데이터 없음" and krx_close > 0:
+                current_price = round(clean_number(usd_price) * fx_rate)
+                diff = current_price - krx_close
+                percent = (diff / krx_close) * 100
+
+                results.append({
+                    "name": stock["name"],
+                    "symbol": stock["symbol"],
+                    "market": "KR",
+                    "krx_code": stock["krx_code"],
+                    "tvSymbol": f"KRX:{stock['krx_code']}",
+                    "price": f"₩{current_price:,}",
+                    "price_number": current_price,
+                    "usd": usd_price,
+                    "fx_rate": fx_rate,
+                    "base_price": krx_close,
+                    "base_price_text": f"₩{krx_close:,}",
+                    "diff_from_base": f"{'+' if diff >= 0 else '-'}₩{abs(diff):,}",
+                    "percent_from_base": f"{'+' if percent >= 0 else ''}{percent:.2f}%",
+                    "is_up": diff >= 0,
+                    "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "source": url,
+                    "status": response.status_code,
+                    "is_24h_supported": True,
+                })
+
+        except Exception as e:
+            print("24시간 지원 종목 검색 오류:", stock["name"], e)
+
+    return {
+        "standard": "24시간 시세 지원 국내 종목만 표시",
+        "count": len(results),
+        "data": results,
+    }
