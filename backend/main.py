@@ -18,23 +18,23 @@ app.add_middleware(
 )
 
 STOCKS = [
-    {"name": "삼성전자", "symbol": "SMSN", "market": "KR", "path": "korea/samsung", "krx_code": "005930", "yahoo": "005930.KS"},
-    {"name": "SK하이닉스", "symbol": "SKHX", "market": "KR", "path": "korea/hynix", "krx_code": "000660", "yahoo": "000660.KS"},
-    {"name": "현대차", "symbol": "HYUNDAI", "market": "KR", "path": "korea/hyundai", "krx_code": "005380", "yahoo": "005380.KS"},
+    {"name": "삼성전자", "symbol": "SMSN", "market": "KR", "quote_type": "24H", "path": "korea/samsung", "krx_code": "005930", "yahoo": "005930.KS"},
+    {"name": "SK하이닉스", "symbol": "SKHX", "market": "KR", "quote_type": "24H", "path": "korea/hynix", "krx_code": "000660", "yahoo": "000660.KS"},
+    {"name": "현대차", "symbol": "HYUNDAI", "market": "KR", "quote_type": "24H", "path": "korea/hyundai", "krx_code": "005380", "yahoo": "005380.KS"},
 
-    {"name": "기아", "symbol": "KIA", "market": "KR", "yahoo": "000270.KS"},
-    {"name": "NAVER", "symbol": "NAVER", "market": "KR", "yahoo": "035420.KS"},
-    {"name": "카카오", "symbol": "KAKAO", "market": "KR", "yahoo": "035720.KS"},
-    {"name": "LG에너지솔루션", "symbol": "LGES", "market": "KR", "yahoo": "373220.KS"},
-    {"name": "삼성바이오로직스", "symbol": "SAMSUNG BIO", "market": "KR", "yahoo": "207940.KS"},
+    {"name": "기아", "symbol": "KIA", "market": "KR", "quote_type": "REFERENCE", "krx_code": "000270", "yahoo": "000270.KS"},
+    {"name": "NAVER", "symbol": "NAVER", "market": "KR", "quote_type": "REFERENCE", "krx_code": "035420", "yahoo": "035420.KS"},
+    {"name": "카카오", "symbol": "KAKAO", "market": "KR", "quote_type": "REFERENCE", "krx_code": "035720", "yahoo": "035720.KS"},
+    {"name": "LG에너지솔루션", "symbol": "LGES", "market": "KR", "quote_type": "REFERENCE", "krx_code": "373220", "yahoo": "373220.KS"},
+    {"name": "삼성바이오로직스", "symbol": "SAMSUNG BIO", "market": "KR", "quote_type": "REFERENCE", "krx_code": "207940", "yahoo": "207940.KS"},
 
-    {"name": "Apple", "symbol": "AAPL", "market": "US", "yahoo": "AAPL"},
-    {"name": "Tesla", "symbol": "TSLA", "market": "US", "yahoo": "TSLA"},
-    {"name": "NVIDIA", "symbol": "NVDA", "market": "US", "yahoo": "NVDA"},
-    {"name": "Microsoft", "symbol": "MSFT", "market": "US", "yahoo": "MSFT"},
-    {"name": "Amazon", "symbol": "AMZN", "market": "US", "yahoo": "AMZN"},
-    {"name": "Meta", "symbol": "META", "market": "US", "yahoo": "META"},
-    {"name": "Google", "symbol": "GOOGL", "market": "US", "yahoo": "GOOGL"},
+    {"name": "Apple", "symbol": "AAPL", "market": "US", "quote_type": "US", "path": "us/apple", "yahoo": "AAPL"},
+    {"name": "Tesla", "symbol": "TSLA", "market": "US", "quote_type": "US", "path": "us/tesla", "yahoo": "TSLA"},
+    {"name": "NVIDIA", "symbol": "NVDA", "market": "US", "quote_type": "US", "path": "us/nvidia", "yahoo": "NVDA"},
+    {"name": "Microsoft", "symbol": "MSFT", "market": "US", "quote_type": "US", "path": "us/microsoft", "yahoo": "MSFT"},
+    {"name": "Amazon", "symbol": "AMZN", "market": "US", "quote_type": "US", "path": "us/amazon", "yahoo": "AMZN"},
+    {"name": "Meta", "symbol": "META", "market": "US", "quote_type": "US", "path": "us/meta", "yahoo": "META"},
+    {"name": "Google", "symbol": "GOOGL", "market": "US", "quote_type": "US", "path": "us/google", "yahoo": "GOOGL"},
 ]
 
 CACHE = {"last_update": 0, "data": []}
@@ -53,20 +53,33 @@ def clean_number(value):
     return float(value.replace("$", "").replace("₩", "").replace(",", "").strip())
 
 
-def get_krx_close(code):
+def get_krx_closes(code):
     url = f"https://finance.naver.com/item/sise_day.naver?code={code}"
     res = requests.get(url, headers=HEADERS, timeout=10)
     soup = BeautifulSoup(res.text, "html.parser")
 
+    closes = []
     rows = soup.select("table.type2 tr")
+
     for row in rows:
         cols = row.select("td")
         if len(cols) >= 2:
             close_text = cols[1].get_text(strip=True).replace(",", "")
             if close_text.isdigit():
-                return int(close_text)
+                closes.append(int(close_text))
 
-    return 0
+        if len(closes) >= 2:
+            break
+
+    latest_close = closes[0] if len(closes) >= 1 else 0
+    previous_close = closes[1] if len(closes) >= 2 else 0
+
+    return latest_close, previous_close
+
+
+def get_krx_close(code):
+    latest_close, _ = get_krx_closes(code)
+    return latest_close
 
 
 def extract_usd_and_fx(html):
@@ -87,8 +100,89 @@ def extract_usd_and_fx(html):
     return usd_price, fx_rate
 
 
+def extract_us_current_and_regular_close(html):
+    text = BeautifulSoup(html, "html.parser").get_text(" ", strip=True)
+
+    usd_prices = re.findall(r"\$\s?[\d,.]+", text)
+
+    current_price = usd_prices[0] if usd_prices else "데이터 없음"
+
+    regular_close = None
+
+    close_patterns = [
+        r"정규장\s*종가\s*\$?\s*([\d,.]+)",
+        r"regular\s*close\s*\$?\s*([\d,.]+)",
+        r"Regular\s*Close\s*\$?\s*([\d,.]+)",
+    ]
+
+    for pattern in close_patterns:
+        match = re.search(pattern, text)
+        if match:
+            regular_close = clean_number(match.group(1))
+            break
+
+    return current_price, regular_close
+
+
+def get_yahoo_previous_close(symbol):
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=2d&interval=1d"
+
+    res = requests.get(url, headers=HEADERS, timeout=10)
+    data = res.json()
+
+    result = data["chart"]["result"][0]
+    meta = result["meta"]
+
+    previous = meta.get("chartPreviousClose", 0) or meta.get("regularMarketPreviousClose", 0)
+
+    if not previous:
+        raise Exception("미국 전일 종가 데이터 없음")
+
+    return previous
+
+
 def fetch_yahoo_stock(stock):
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{stock['yahoo']}?range=2d&interval=1d"
+    if stock["market"] == "US" and stock.get("path"):
+        url = f"https://kr-stocks.com/{stock['path']}"
+
+        try:
+            response = requests.get(url, headers=HEADERS, timeout=10)
+            usd_price, regular_close = extract_us_current_and_regular_close(response.text)
+
+            if usd_price == "데이터 없음":
+                raise Exception("kr-stocks 미국 현재가 데이터 없음")
+
+            current = clean_number(usd_price)
+
+            if not regular_close:
+                regular_close = get_yahoo_previous_close(stock["yahoo"])
+
+            diff = current - regular_close
+            percent = (diff / regular_close) * 100
+
+            return {
+                "name": stock["name"],
+                "symbol": stock["symbol"],
+                "market": stock["market"],
+                "quote_type": stock.get("quote_type", "US"),
+                "price": f"${current:,.2f}",
+                "price_number": round(current, 2),
+                "usd": f"${current:,.2f}",
+                "fx_rate": 0,
+                "base_price": round(regular_close, 2),
+                "base_price_text": f"${regular_close:,.2f}",
+                "diff_from_base": f"{'+' if diff >= 0 else '-'}${abs(diff):,.2f}",
+                "percent_from_base": f"{'+' if percent >= 0 else ''}{percent:.2f}%",
+                "is_up": diff >= 0,
+                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "source": url,
+                "status": response.status_code,
+            }
+
+        except Exception as e:
+            print("kr-stocks 미국 종목 데이터 오류:", stock["name"], e)
+
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{stock['yahoo']}?range=1d&interval=1m&includePrePost=true"
 
     try:
         res = requests.get(url, headers=HEADERS, timeout=10)
@@ -97,37 +191,61 @@ def fetch_yahoo_stock(stock):
         result = data["chart"]["result"][0]
         meta = result["meta"]
 
-        current = meta.get("regularMarketPrice", 0)
-        previous = meta.get("chartPreviousClose", 0)
+        if stock["market"] == "KR":
+            latest_close, previous_close = get_krx_closes(stock["krx_code"])
+
+            if not latest_close or not previous_close:
+                raise Exception("KRX 종가 데이터 부족")
+
+            diff = latest_close - previous_close
+            percent = (diff / previous_close) * 100
+
+            return {
+                "name": stock["name"],
+                "symbol": stock["symbol"],
+                "market": stock["market"],
+                "quote_type": stock.get("quote_type", "REFERENCE"),
+                "krx_code": stock.get("krx_code", ""),
+                "tvSymbol": f"KRX:{stock.get('krx_code', '')}",
+                "price": f"₩{round(latest_close):,}",
+                "price_number": round(latest_close, 2),
+                "usd": "KRX 최근 종가 기준 참고",
+                "fx_rate": 0,
+                "base_price": round(previous_close, 2),
+                "base_price_text": f"₩{round(previous_close):,}",
+                "diff_from_base": f"{'+' if diff >= 0 else '-'}₩{abs(round(diff)):,}",
+                "percent_from_base": f"{'+' if percent >= 0 else ''}{percent:.2f}%",
+                "is_up": diff >= 0,
+                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "source": url,
+                "status": res.status_code,
+                "is_24h_supported": False,
+            }
+
+        closes = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+        valid_closes = [price for price in closes if price is not None]
+
+        current = valid_closes[-1] if valid_closes else meta.get("regularMarketPrice", 0)
+        previous = meta.get("chartPreviousClose", 0) or meta.get("regularMarketPreviousClose", 0)
 
         if not current or not previous:
-            raise Exception("가격 데이터 없음")
+            raise Exception("미국 주식 가격 데이터 부족")
 
         diff = current - previous
         percent = (diff / previous) * 100
-
-        if stock["market"] == "KR":
-            price_text = f"₩{round(current):,}"
-            base_text = f"₩{round(previous):,}"
-            usd_text = "KRW"
-            diff_text = f"{'+' if diff >= 0 else '-'}₩{abs(round(diff)):,}"
-        else:
-            price_text = f"${current:,.2f}"
-            base_text = f"${previous:,.2f}"
-            usd_text = f"${current:,.2f}"
-            diff_text = f"{'+' if diff >= 0 else '-'}${abs(diff):,.2f}"
 
         return {
             "name": stock["name"],
             "symbol": stock["symbol"],
             "market": stock["market"],
-            "price": price_text,
+            "quote_type": stock.get("quote_type", "US"),
+            "price": f"${current:,.2f}",
             "price_number": round(current, 2),
-            "usd": usd_text,
+            "usd": f"${current:,.2f}",
             "fx_rate": 0,
             "base_price": round(previous, 2),
-            "base_price_text": base_text,
-            "diff_from_base": diff_text,
+            "base_price_text": f"${previous:,.2f}",
+            "diff_from_base": f"{'+' if diff >= 0 else '-'}${abs(diff):,.2f}",
             "percent_from_base": f"{'+' if percent >= 0 else ''}{percent:.2f}%",
             "is_up": diff >= 0,
             "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -140,6 +258,7 @@ def fetch_yahoo_stock(stock):
             "name": stock["name"],
             "symbol": stock["symbol"],
             "market": stock["market"],
+            "quote_type": stock.get("quote_type", "UNKNOWN"),
             "price": "데이터 없음",
             "usd": "데이터 없음",
             "fx_rate": 0,
@@ -156,7 +275,7 @@ def fetch_stock_data():
     results = []
 
     for stock in STOCKS:
-        if stock.get("path") and stock.get("krx_code"):
+        if stock["market"] == "KR" and stock.get("quote_type") == "24H":
             url = f"https://kr-stocks.com/{stock['path']}"
 
             try:
@@ -173,6 +292,9 @@ def fetch_stock_data():
                         "name": stock["name"],
                         "symbol": stock["symbol"],
                         "market": stock["market"],
+                        "quote_type": "24H",
+                        "krx_code": stock["krx_code"],
+                        "tvSymbol": f"KRX:{stock['krx_code']}",
                         "price": f"₩{current_price:,}",
                         "price_number": current_price,
                         "usd": usd_price,
@@ -185,12 +307,12 @@ def fetch_stock_data():
                         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                         "source": url,
                         "status": response.status_code,
+                        "is_24h_supported": True,
                     })
-                else:
-                    results.append(fetch_yahoo_stock(stock))
 
-            except Exception:
-                results.append(fetch_yahoo_stock(stock))
+            except Exception as e:
+                print("24시간 국내 종목 데이터 오류:", stock["name"], e)
+
         else:
             results.append(fetch_yahoo_stock(stock))
 
@@ -463,6 +585,8 @@ def get_market_summary():
         "summary": summary,
         "data": results,
     }
+
+
 @app.get("/api/stock-quote")
 def get_stock_quote(symbol: str = Query(...), market: str = Query("KR")):
     candidates = []
@@ -530,6 +654,8 @@ def get_stock_quote(symbol: str = Query(...), market: str = Query("KR")):
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "status": 404,
     }
+
+
 @app.get("/api/search-24h-stocks")
 def search_24h_stocks(q: str = Query("")):
     keyword = q.lower().replace(" ", "")
@@ -570,6 +696,7 @@ def search_24h_stocks(q: str = Query("")):
                     "name": stock["name"],
                     "symbol": stock["symbol"],
                     "market": "KR",
+                    "quote_type": "24H",
                     "krx_code": stock["krx_code"],
                     "tvSymbol": f"KRX:{stock['krx_code']}",
                     "price": f"₩{current_price:,}",
