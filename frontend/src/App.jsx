@@ -31,7 +31,7 @@ function App() {
   const [visitorStats, setVisitorStats] = useState({ active: 0, total: 0 });
 
   const tabs = ["주식", "ETF", "차트", "분석", "이슈", "관심종목"];
-  const API_BASE = "http://127.0.0.1:8000";
+  const API_BASE = "https://kr-stocks-project.onrender.com";
   const NEXA_LOGO_SVG = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
       <defs>
