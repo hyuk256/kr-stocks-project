@@ -66,6 +66,8 @@ function App() {
   const SERVICE_NOTICE =
     "NEXA는 주식 및 금융시장 정보를 제공하는 참고용 서비스이며, 특정 종목의 매수·매도 또는 투자를 권유하지 않습니다. 모든 투자 결정과 그에 따른 손익 책임은 투자자 본인에게 있습니다.";
   const DATA_SOURCES = ["Yahoo Finance", "Hyperliquid", "Google News", "TradingView", "NXT", "네이버 증권"];
+  const ADMIN_KEY = "nexa-admin-2026";
+
 
   const ETF_BASE_DATA = [
     {
@@ -573,6 +575,10 @@ function App() {
 
     return () => clearInterval(intervalId);
   }, [isUnlocked, selectedChart?.symbol, selectedSymbol, hyperInterval]);
+
+  const isAdminPage = window.location.pathname === "/admin";
+  const adminKey = new URLSearchParams(window.location.search).get("key") || "";
+  const isAdminAuthorized = adminKey === ADMIN_KEY;
 
   const selectedStock =
     stocks.find((stock) => stock.symbol === selectedSymbol) || stocks[0] || null;
@@ -2202,6 +2208,76 @@ function App() {
       );
     };
 
+        const renderAdminPage = () => {
+      if (!isAdminAuthorized) {
+        return (
+          <div style={styles.app}>
+            <style>{globalResetStyle}</style>
+            <div style={styles.adminPageWrap}>
+              <div style={styles.adminCard}>
+                <div style={styles.adminLogoRow}>
+                  <img src={LOGO_SRC} alt="NEXA" style={styles.adminLogo} />
+                  <div>
+                    <div style={styles.adminTitle}>NEXA 관리자</div>
+                    <div style={styles.adminSub}>접근 권한이 없습니다.</div>
+                  </div>
+                </div>
+                <div style={styles.adminWarningBox}>
+                  관리자 주소는 <strong>/admin?key=관리자키</strong> 형식으로 접속해야 합니다.
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div style={styles.app}>
+          <style>{globalResetStyle}</style>
+          <div style={styles.adminPageWrap}>
+            <div style={styles.adminCard}>
+              <div style={styles.adminLogoRow}>
+                <img src={LOGO_SRC} alt="NEXA" style={styles.adminLogo} />
+                <div>
+                  <div style={styles.adminTitle}>NEXA 관리자</div>
+                  <div style={styles.adminSub}>방문자 통계 전용 화면</div>
+                </div>
+              </div>
+
+              <div style={styles.adminStatsGrid}>
+                <div style={styles.adminStatBox}>
+                  <div style={styles.adminStatLabel}>현재 접속자</div>
+                  <div style={styles.adminStatValue}>{visitorStats.active.toLocaleString()}명</div>
+                  <div style={styles.adminStatHint}>최근 60초 기준</div>
+                </div>
+
+                <div style={styles.adminStatBox}>
+                  <div style={styles.adminStatLabel}>총 방문자</div>
+                  <div style={styles.adminStatValue}>{visitorStats.total.toLocaleString()}명</div>
+                  <div style={styles.adminStatHint}>브라우저 방문 ID 기준</div>
+                </div>
+              </div>
+
+              <div style={styles.adminInfoBox}>
+                <div>마지막 확인 시간: <strong>{time || new Date().toLocaleTimeString()}</strong></div>
+                <div>15초마다 자동 갱신됩니다.</div>
+              </div>
+
+              <button
+                type="button"
+                style={styles.adminBackButton}
+                onClick={() => {
+                  window.location.href = "/";
+                }}
+              >
+                사이트로 돌아가기
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
         const renderContent = () => {
       switch (activeTab) {
         case "주식":
@@ -2226,6 +2302,10 @@ function App() {
           return null;
       }
     };
+
+    if (isAdminPage) {
+      return renderAdminPage();
+    }
 
     return (
       <div style={styles.app}>
@@ -2353,8 +2433,7 @@ function App() {
               <span>실시간 업데이트</span>
               <strong>{time || "--:--:--"}</strong>
               <span style={styles.visitorDivider} />
-              <span style={styles.visitorPill}>실시간 {visitorStats.active.toLocaleString()}명</span>
-              <span style={styles.visitorPill}>누적 {visitorStats.total.toLocaleString()}명</span>
+              <span style={styles.visitorPill}>관리자 전용 통계 운영 중</span>
             </div>
           </div>
         </div>
@@ -2571,6 +2650,121 @@ function App() {
 }
 
 const styles = {
+  adminPageWrap: {
+    width: "100%",
+    minHeight: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "32px",
+  },
+
+  adminCard: {
+    width: "min(720px, 100%)",
+    borderRadius: "28px",
+    border: "1px solid rgba(148,163,184,0.18)",
+    background: "linear-gradient(180deg, rgba(15,23,42,0.96), rgba(2,6,23,0.98))",
+    boxShadow: "0 30px 80px rgba(0,0,0,0.45)",
+    padding: "30px",
+  },
+
+  adminLogoRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
+    marginBottom: "24px",
+  },
+
+  adminLogo: {
+    width: "58px",
+    height: "58px",
+    borderRadius: "16px",
+  },
+
+  adminTitle: {
+    fontSize: "28px",
+    fontWeight: 950,
+    color: "#f8fafc",
+  },
+
+  adminSub: {
+    marginTop: "4px",
+    color: "#94a3b8",
+    fontSize: "14px",
+    fontWeight: 800,
+  },
+
+  adminStatsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "16px",
+    marginTop: "18px",
+  },
+
+  adminStatBox: {
+    borderRadius: "20px",
+    border: "1px solid rgba(59,130,246,0.20)",
+    background: "rgba(15,23,42,0.78)",
+    padding: "22px",
+  },
+
+  adminStatLabel: {
+    color: "#93c5fd",
+    fontSize: "14px",
+    fontWeight: 900,
+  },
+
+  adminStatValue: {
+    marginTop: "10px",
+    color: "#ffffff",
+    fontSize: "42px",
+    fontWeight: 950,
+    letterSpacing: "-1px",
+  },
+
+  adminStatHint: {
+    marginTop: "8px",
+    color: "#64748b",
+    fontSize: "12px",
+    fontWeight: 800,
+  },
+
+  adminInfoBox: {
+    marginTop: "18px",
+    borderRadius: "16px",
+    border: "1px solid rgba(148,163,184,0.16)",
+    background: "rgba(2,6,23,0.45)",
+    color: "#cbd5e1",
+    padding: "16px",
+    lineHeight: 1.7,
+    fontSize: "14px",
+    fontWeight: 800,
+  },
+
+  adminWarningBox: {
+    borderRadius: "16px",
+    border: "1px solid rgba(234,179,8,0.28)",
+    background: "rgba(234,179,8,0.10)",
+    color: "#fde68a",
+    padding: "16px",
+    lineHeight: 1.7,
+    fontSize: "14px",
+    fontWeight: 800,
+  },
+
+  adminBackButton: {
+    marginTop: "18px",
+    width: "100%",
+    border: "1px solid rgba(59,130,246,0.35)",
+    borderRadius: "16px",
+    background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+    color: "white",
+    padding: "15px 18px",
+    fontSize: "15px",
+    fontWeight: 950,
+    cursor: "pointer",
+  },
+
   app: {
     width: "100vw",
     minHeight: "100vh",
