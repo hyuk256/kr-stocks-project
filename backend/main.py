@@ -262,8 +262,9 @@ def get_kr_24h_quote(stock):
 
 def get_us_24h_quote(symbol, regular_close=None):
     # 미국 24H 지원 종목은 kr-stocks.com/Hyperliquid 참고 시세를 우선 사용합니다.
-    # 현재가와 기준가가 서로 다른 소스에서 섞이면 등락률이 크게 틀어질 수 있으므로,
-    # 기준가는 kr-stocks.com 페이지에서 읽은 정규장 종가를 먼저 사용합니다.
+    # 현재가는 kr-stocks.com 24H/PRE 값을 그대로 사용하고,
+    # 기준가는 Yahoo quote/chart에서 "가장 최근에 완료된 정규장 종가"만 사용합니다.
+    # PRE/REGULAR 중이면 전장 종가, AFTER/CLOSED 중이면 방금 끝난 정규장 종가가 기준입니다.
     paths = get_us_24h_paths(symbol)
 
     if not paths:
@@ -275,17 +276,12 @@ def get_us_24h_quote(symbol, regular_close=None):
         try:
             url = f"https://kr-stocks.com/{path}"
             response = requests.get(url, headers=HEADERS, timeout=10)
-            usd_price, parsed_regular_close = extract_us_current_and_regular_close(response.text)
+            usd_price, _ = extract_us_current_and_regular_close(response.text)
 
             if usd_price == "데이터 없음":
                 raise Exception("미국 24H 참고 현재가 데이터 없음")
 
             current = clean_number(usd_price)
-
-            # 핵심 수정:
-            # 현재가는 kr-stocks.com 24H/PRE 값을 그대로 쓰고,
-            # 기준가는 Stooq/Yahoo 일봉의 가장 최근 정규장 마감 종가만 사용합니다.
-            # 월요일 프리장/24H 가격이면 금요일 정규장 종가와 비교됩니다.
             base_price = get_yahoo_previous_close(symbol)
 
             if not current or not base_price:
@@ -298,7 +294,6 @@ def get_us_24h_quote(symbol, regular_close=None):
             print("미국 24H 경로 시도 실패:", symbol, path, e)
 
     raise Exception(f"미국 24H 참고 시세 데이터 부족: {last_error}")
-
 
 def get_us_session_label(symbol=None):
     # 미국 주식 세션 표시: Yahoo quote API의 marketState를 우선 사용하고,
@@ -411,9 +406,16 @@ def extract_us_current_and_regular_close(html):
     regular_close = None
 
     close_patterns = [
-        r"정규장\s*종가\s*\$?\s*([\d,.]+)",
-        r"regular\s*close\s*\$?\s*([\d,.]+)",
-        r"Regular\s*Close\s*\$?\s*([\d,.]+)",
+        r"정규장\s*종가\s*[:：]?\s*\$?\s*([\d,.]+)",
+        r"정규장\s*마감가\s*[:：]?\s*\$?\s*([\d,.]+)",
+        r"전일\s*종가\s*[:：]?\s*\$?\s*([\d,.]+)",
+        r"이전\s*종가\s*[:：]?\s*\$?\s*([\d,.]+)",
+        r"기준가\s*[:：]?\s*\$?\s*([\d,.]+)",
+        r"regular\s*market\s*close\s*[:：]?\s*\$?\s*([\d,.]+)",
+        r"regular\s*close\s*[:：]?\s*\$?\s*([\d,.]+)",
+        r"Regular\s*Close\s*[:：]?\s*\$?\s*([\d,.]+)",
+        r"Previous\s*Close\s*[:：]?\s*\$?\s*([\d,.]+)",
+        r"Prev\s*Close\s*[:：]?\s*\$?\s*([\d,.]+)",
     ]
 
     for pattern in close_patterns:
@@ -426,78 +428,90 @@ def extract_us_current_and_regular_close(html):
 
 
 def get_yahoo_previous_close(symbol):
-    # 미국 기준가: 가장 최근에 완전히 마감된 정규장 종가만 사용합니다.
-    # 현재가(kr-stocks.com 24H/PRE)는 그대로 두고, 전일 종가만 별도 일봉 데이터에서 가져옵니다.
-    # 월요일 프리장/24H 가격이면 금요일 정규장 종가가 기준이 됩니다.
+    # 미국 기준가: "가장 최근에 완료된 정규장 종가"만 사용합니다.
+    # - PRE/REGULAR: 전장 종가(regularMarketPreviousClose)
+    # - AFTER/CLOSED: 방금 끝난 정규장 종가(regularMarketPrice)
+    # 현재가(kr-stocks.com 24H/PRE)는 그대로 두고, 기준가만 Yahoo에서 세션별로 가져옵니다.
     symbol = str(symbol or "").strip().upper()
 
-    # 1순위: Stooq 일봉 CSV
-    # Stooq 일봉은 보통 아직 마감되지 않은 당일 장중 캔들을 넣지 않으므로,
-    # PRE/24H/주말 상황에서 "가장 최근 정규장 마감 종가" 기준으로 쓰기 좋습니다.
-    stooq_symbol = symbol.lower().replace(".", "-")
-    stooq_url = f"https://stooq.com/q/d/l/?s={stooq_symbol}.us&i=d"
-
+    # 1순위: Yahoo quote API
+    # 정규장 이후에는 regularMarketPreviousClose가 전전장 종가처럼 보일 수 있으므로
+    # POST/AFTER/CLOSED 상태에서는 regularMarketPrice를 기준가로 사용합니다.
     try:
-        res = requests.get(stooq_url, headers=HEADERS, timeout=10)
-        rows = [line.strip() for line in res.text.splitlines() if line.strip()]
+        quote_url = (
+            "https://query1.finance.yahoo.com/v7/finance/quote"
+            f"?symbols={symbol}"
+        )
+        quote_res = requests.get(quote_url, headers=HEADERS, timeout=10)
+        quote_data = quote_res.json()
+        quote_result = quote_data.get("quoteResponse", {}).get("result", [])
 
-        valid_closes = []
+        if quote_result:
+            item = quote_result[0]
+            market_state = str(item.get("marketState", "")).upper()
 
-        for row in rows[1:]:
-            cols = row.split(",")
+            regular_price = item.get("regularMarketPrice", 0) or 0
+            previous_close = item.get("regularMarketPreviousClose", 0) or 0
 
-            if len(cols) < 5:
-                continue
+            if market_state in ["POST", "POSTPOST", "CLOSED", "CLOSE", "ENDED"]:
+                if regular_price and float(regular_price) > 0:
+                    return float(regular_price)
 
-            close_text = cols[4].strip()
+            if market_state in ["PRE", "PREPRE", "REGULAR"]:
+                if previous_close and float(previous_close) > 0:
+                    return float(previous_close)
 
-            try:
-                close_price = float(close_text)
-                if close_price > 0:
-                    valid_closes.append(close_price)
-            except Exception:
-                continue
+            if regular_price and float(regular_price) > 0:
+                return float(regular_price)
 
-        if valid_closes:
-            return valid_closes[-1]
+            if previous_close and float(previous_close) > 0:
+                return float(previous_close)
 
     except Exception as e:
-        print("Stooq 미국 전일 종가 조회 오류:", symbol, e)
+        print("Yahoo quote 미국 기준가 조회 오류:", symbol, e)
 
     # 2순위 fallback: Yahoo 일봉 close
-    # meta 값은 프리장/24H 상황에서 기준이 틀어질 수 있어 마지막 fallback으로만 사용합니다.
-    now_ny = datetime.now(ZoneInfo("America/New_York"))
+    # 오늘 정규장이 끝난 뒤에는 오늘 일봉 종가를 포함하고,
+    # PRE/REGULAR 시간에는 오늘 미완성 일봉을 제외하고 전장 종가만 사용합니다.
+    try:
+        now_ny = datetime.now(ZoneInfo("America/New_York"))
+        url = (
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+            f"?range=15d&interval=1d&events=history&includePrePost=false"
+        )
 
-    if now_ny.weekday() < 5 and now_ny.time() >= dt_time(16, 0):
-        end_dt = (now_ny + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-    else:
-        end_dt = now_ny.replace(hour=0, minute=0, second=0, microsecond=0)
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        data = res.json()
+        result = data["chart"]["result"][0]
 
-    start_dt = end_dt - timedelta(days=30)
-    period1 = int(start_dt.timestamp())
-    period2 = int(end_dt.timestamp())
+        timestamps = result.get("timestamp", []) or []
+        quote = result.get("indicators", {}).get("quote", [{}])[0]
+        closes = quote.get("close", []) or []
 
-    url = (
-        f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-        f"?period1={period1}&period2={period2}&interval=1d&events=history&includePrePost=false"
-    )
+        completed_today = (
+            now_ny.weekday() < 5
+            and now_ny.time() >= dt_time(16, 0)
+        )
 
-    res = requests.get(url, headers=HEADERS, timeout=10)
-    data = res.json()
+        valid_daily = []
 
-    result = data["chart"]["result"][0]
-    quote = result.get("indicators", {}).get("quote", [{}])[0]
-    closes = quote.get("close", [])
-    valid_closes = [price for price in closes if price is not None and price > 0]
+        for ts, close_price in zip(timestamps, closes):
+            if close_price is None or close_price <= 0:
+                continue
 
-    if valid_closes:
-        return valid_closes[-1]
+            bar_date = datetime.fromtimestamp(ts, ZoneInfo("America/New_York")).date()
 
-    meta = result.get("meta", {})
-    fallback = meta.get("regularMarketPreviousClose", 0) or meta.get("chartPreviousClose", 0)
+            # 정규장이 아직 끝나지 않은 오늘 일봉은 기준가에서 제외합니다.
+            if bar_date == now_ny.date() and not completed_today:
+                continue
 
-    if fallback:
-        return fallback
+            valid_daily.append(float(close_price))
+
+        if valid_daily:
+            return valid_daily[-1]
+
+    except Exception as e:
+        print("Yahoo 일봉 미국 기준가 조회 오류:", symbol, e)
 
     raise Exception("미국 최근 정규장 종가 데이터 없음")
 
@@ -2038,7 +2052,9 @@ def get_stock_quote(symbol: str = Query(...), market: str = Query("KR")):
         try:
             us_session_label = get_us_session_label(yahoo_symbol)
 
-            if us_session_label == "CLOSED" and get_us_24h_path(yahoo_symbol):
+            if get_us_24h_path(yahoo_symbol):
+                # 검색/개별 조회도 기본 미국 종목과 같은 기준으로 맞춥니다.
+                # 현재가와 기준가 모두 kr-stocks.com 24H 페이지를 우선 사용합니다.
                 current, previous, source_url, status_code = get_us_24h_quote(yahoo_symbol)
             else:
                 current, previous = get_us_completed_previous_close_from_daily_chart(yahoo_symbol)
@@ -2063,9 +2079,9 @@ def get_stock_quote(symbol: str = Query(...), market: str = Query("KR")):
                 "is_up": diff >= 0,
                 "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "status": status_code,
-                "standard": "24H 참고 시세" if us_session_label == "CLOSED" and get_us_24h_path(yahoo_symbol) else "Yahoo 세션별 현재가 + regularMarketPreviousClose 기준",
+                "standard": "kr-stocks.com 24H 현재가 + kr-stocks.com 정규장 종가 우선 기준" if get_us_24h_path(yahoo_symbol) else "Yahoo 세션별 현재가 + 직전 정규장 종가 기준",
                 "source": source_url,
-                "session_label": "24H" if us_session_label == "CLOSED" and get_us_24h_path(yahoo_symbol) else us_session_label,
+                "session_label": "24H" if get_us_24h_path(yahoo_symbol) else us_session_label,
                 "is_24h_supported": bool(get_us_24h_path(yahoo_symbol)),
             }
 
