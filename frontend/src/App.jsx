@@ -594,6 +594,7 @@ function App() {
     AMZN: "NASDAQ:AMZN",
     META: "NASDAQ:META",
     GOOGL: "NASDAQ:GOOGL",
+    MU: "NASDAQ:MU",
 
     SPY: "AMEX:SPY",
     QQQ: "NASDAQ:QQQ",
@@ -1275,7 +1276,7 @@ function App() {
             </button>
           </div>
 
-          {(stockMarketTab === "NXT" || stockMarketTab === "US") ? (
+          {stockMarketTab === "NXT" ? (
             <div style={styles.stockSearchBox}>
               <input
                 style={styles.stockSearchInput}
@@ -1312,12 +1313,14 @@ function App() {
             </div>
           ) : (
             <div style={styles.stockSearchPlaceholder}>
-              24시간 지원 종목은 고정 목록만 표시됩니다.
+              {stockMarketTab === "US"
+                ? "미국 기본 종목은 고정 목록만 표시됩니다."
+                : "24시간 지원 종목은 고정 목록만 표시됩니다."}
             </div>
           )}
         </div>
 
-        {(stockMarketTab === "NXT" || stockMarketTab === "US") &&
+        {stockMarketTab === "NXT" &&
           searchedStocksForCurrentMarket.length > 0 && (
           <div style={styles.sectionPanel}>
             <div style={styles.sectionHeader}>
@@ -2444,6 +2447,10 @@ function App() {
                   <span style={{ color: "#ea3943" }}>하락 {downCount}</span>
                   <span>24H {liveCount}</span>
                 </div>
+
+                <div style={styles.loadingNotice}>
+                  처음 접속하거나 서버가 대기 상태일 경우 데이터 로드까지 1~2분 정도 소요될 수 있습니다.
+                </div>
               </div>
             </div>
 
@@ -3387,6 +3394,17 @@ const styles = {
     color: "#9fb0c8",
     fontSize: "12px",
     fontWeight: "900",
+  },
+
+  loadingNotice: {
+    padding: "10px 12px",
+    borderRadius: "12px",
+    background: "rgba(37,99,235,0.10)",
+    border: "1px solid rgba(96,165,250,0.18)",
+    color: "#bfdbfe",
+    fontSize: "12px",
+    fontWeight: "850",
+    lineHeight: 1.45,
   },
 
   summaryGrid: {

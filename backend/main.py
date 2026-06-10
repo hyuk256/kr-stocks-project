@@ -7,7 +7,7 @@ import json
 import os
 import hashlib
 import feedparser
-from datetime import datetime, time as dt_time
+from datetime import datetime, time as dt_time, timedelta
 from zoneinfo import ZoneInfo
 from bs4 import BeautifulSoup
 
@@ -38,6 +38,7 @@ STOCKS = [
     {"name": "Amazon", "symbol": "AMZN", "market": "US", "quote_type": "US", "path": "us/amazon", "yahoo": "AMZN"},
     {"name": "Meta", "symbol": "META", "market": "US", "quote_type": "US", "path": "us/meta", "yahoo": "META"},
     {"name": "Google", "symbol": "GOOGL", "market": "US", "quote_type": "US", "path": "us/google", "yahoo": "GOOGL"},
+    {"name": "Micron Technology", "symbol": "MU", "market": "US", "quote_type": "US", "path": "us/micron", "yahoo": "MU"},
 ]
 
 CACHE = {"last_update": 0, "data": []}
@@ -260,8 +261,9 @@ def get_kr_24h_quote(stock):
 
 
 def get_us_24h_quote(symbol, regular_close=None):
-    # 미국 24H 지원 종목은 CLOSED 시간대에 kr-stocks.com/Hyperliquid 참고 시세를 사용합니다.
-    # 종목별 URL 경로가 바뀔 수 있어 여러 후보 경로를 순서대로 시도합니다.
+    # 미국 24H 지원 종목은 kr-stocks.com/Hyperliquid 참고 시세를 우선 사용합니다.
+    # 현재가와 기준가가 서로 다른 소스에서 섞이면 등락률이 크게 틀어질 수 있으므로,
+    # 기준가는 kr-stocks.com 페이지에서 읽은 정규장 종가를 먼저 사용합니다.
     paths = get_us_24h_paths(symbol)
 
     if not paths:
@@ -279,7 +281,12 @@ def get_us_24h_quote(symbol, regular_close=None):
                 raise Exception("미국 24H 참고 현재가 데이터 없음")
 
             current = clean_number(usd_price)
-            base_price = regular_close or parsed_regular_close or get_yahoo_previous_close(symbol)
+
+            # 핵심 수정:
+            # 현재가는 kr-stocks.com 24H/PRE 값을 그대로 쓰고,
+            # 기준가는 Stooq/Yahoo 일봉의 가장 최근 정규장 마감 종가만 사용합니다.
+            # 월요일 프리장/24H 가격이면 금요일 정규장 종가와 비교됩니다.
+            base_price = get_yahoo_previous_close(symbol)
 
             if not current or not base_price:
                 raise Exception("미국 24H 참고 가격 데이터 부족")
@@ -419,29 +426,89 @@ def extract_us_current_and_regular_close(html):
 
 
 def get_yahoo_previous_close(symbol):
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=2d&interval=1d"
+    # 미국 기준가: 가장 최근에 완전히 마감된 정규장 종가만 사용합니다.
+    # 현재가(kr-stocks.com 24H/PRE)는 그대로 두고, 전일 종가만 별도 일봉 데이터에서 가져옵니다.
+    # 월요일 프리장/24H 가격이면 금요일 정규장 종가가 기준이 됩니다.
+    symbol = str(symbol or "").strip().upper()
+
+    # 1순위: Stooq 일봉 CSV
+    # Stooq 일봉은 보통 아직 마감되지 않은 당일 장중 캔들을 넣지 않으므로,
+    # PRE/24H/주말 상황에서 "가장 최근 정규장 마감 종가" 기준으로 쓰기 좋습니다.
+    stooq_symbol = symbol.lower().replace(".", "-")
+    stooq_url = f"https://stooq.com/q/d/l/?s={stooq_symbol}.us&i=d"
+
+    try:
+        res = requests.get(stooq_url, headers=HEADERS, timeout=10)
+        rows = [line.strip() for line in res.text.splitlines() if line.strip()]
+
+        valid_closes = []
+
+        for row in rows[1:]:
+            cols = row.split(",")
+
+            if len(cols) < 5:
+                continue
+
+            close_text = cols[4].strip()
+
+            try:
+                close_price = float(close_text)
+                if close_price > 0:
+                    valid_closes.append(close_price)
+            except Exception:
+                continue
+
+        if valid_closes:
+            return valid_closes[-1]
+
+    except Exception as e:
+        print("Stooq 미국 전일 종가 조회 오류:", symbol, e)
+
+    # 2순위 fallback: Yahoo 일봉 close
+    # meta 값은 프리장/24H 상황에서 기준이 틀어질 수 있어 마지막 fallback으로만 사용합니다.
+    now_ny = datetime.now(ZoneInfo("America/New_York"))
+
+    if now_ny.weekday() < 5 and now_ny.time() >= dt_time(16, 0):
+        end_dt = (now_ny + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        end_dt = now_ny.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    start_dt = end_dt - timedelta(days=30)
+    period1 = int(start_dt.timestamp())
+    period2 = int(end_dt.timestamp())
+
+    url = (
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+        f"?period1={period1}&period2={period2}&interval=1d&events=history&includePrePost=false"
+    )
 
     res = requests.get(url, headers=HEADERS, timeout=10)
     data = res.json()
 
     result = data["chart"]["result"][0]
-    meta = result["meta"]
+    quote = result.get("indicators", {}).get("quote", [{}])[0]
+    closes = quote.get("close", [])
+    valid_closes = [price for price in closes if price is not None and price > 0]
 
-    previous = meta.get("regularMarketPreviousClose", 0) or meta.get("chartPreviousClose", 0)
+    if valid_closes:
+        return valid_closes[-1]
 
-    if not previous:
-        raise Exception("미국 전일 종가 데이터 없음")
+    meta = result.get("meta", {})
+    fallback = meta.get("regularMarketPreviousClose", 0) or meta.get("chartPreviousClose", 0)
 
-    return previous
+    if fallback:
+        return fallback
+
+    raise Exception("미국 최근 정규장 종가 데이터 없음")
 
 
 def fetch_yahoo_stock(stock):
     if stock["market"] == "US":
         session_label = get_us_session_label(stock.get("yahoo") or stock.get("symbol"))
 
-        # 미국 24H 지원 종목은 장이 완전히 닫힌 시간에만 24H 참고 시세를 사용합니다.
-        # PRE / REGULAR / AFTER 시간에는 Yahoo의 해당 세션 가격을 우선 사용합니다.
-        if session_label == "CLOSED" and get_us_24h_path(stock.get("symbol") or stock.get("yahoo")):
+        # 미국 24H 지원 종목은 세션과 관계없이 kr-stocks.com/Hyperliquid 기준으로 표시합니다.
+        # PRE / REGULAR / AFTER / CLOSED에서 Yahoo와 24H 소스가 섞이면 기준가가 틀어질 수 있습니다.
+        if get_us_24h_path(stock.get("symbol") or stock.get("yahoo")):
             try:
                 current, regular_close, source_url, status_code = get_us_24h_quote(stock.get("symbol") or stock.get("yahoo"))
                 diff = current - regular_close
