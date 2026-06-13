@@ -36,41 +36,41 @@ function App() {
 
   const tabs = ["주식", "ETF", "차트", "분석", "이슈", "관심종목"];
   const API_BASE = "https://kr-stocks-project.onrender.com";
-  const NEXA_LOGO_SVG = `
+  const ZYVORA_LOGO_SVG = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
       <defs>
-        <linearGradient id="nexaBg" x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id="zyvoraBg" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stop-color="#020617"/>
           <stop offset="100%" stop-color="#111827"/>
         </linearGradient>
-        <linearGradient id="nexaMain" x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id="zyvoraMain" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stop-color="#2dd4bf"/>
           <stop offset="48%" stop-color="#0ea5e9"/>
           <stop offset="100%" stop-color="#2563eb"/>
         </linearGradient>
-        <linearGradient id="nexaArrow" x1="0" y1="1" x2="1" y2="0">
+        <linearGradient id="zyvoraArrow" x1="0" y1="1" x2="1" y2="0">
           <stop offset="0%" stop-color="#2563eb"/>
           <stop offset="100%" stop-color="#5eead4"/>
         </linearGradient>
-        <filter id="nexaGlow" x="-40%" y="-40%" width="180%" height="180%">
+        <filter id="zyvoraGlow" x="-40%" y="-40%" width="180%" height="180%">
           <feGaussianBlur stdDeviation="3" result="blur"/>
           <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.13 0 0 0 0 0.68 0 0 0 0 0.96 0 0 0 0.72 0"/>
           <feBlend in="SourceGraphic"/>
         </filter>
       </defs>
-      <rect width="128" height="128" rx="30" fill="url(#nexaBg)"/>
-      <path d="M37 86V32c0-5.4 4.4-9.8 9.8-9.8H58v39.4l30.7-39.4h20.6L76.2 62.1l34.2 43.7H88.8L58 65.9V106H46.8C41.4 106 37 101.6 37 96.2V86Z" fill="url(#nexaMain)" filter="url(#nexaGlow)"/>
-      <path d="M19 92L38 73L53 82L72 62L84 70L107 43" fill="none" stroke="url(#nexaArrow)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect width="128" height="128" rx="30" fill="url(#zyvoraBg)"/>
+      <path d="M37 86V32c0-5.4 4.4-9.8 9.8-9.8H58v39.4l30.7-39.4h20.6L76.2 62.1l34.2 43.7H88.8L58 65.9V106H46.8C41.4 106 37 101.6 37 96.2V86Z" fill="url(#zyvoraMain)" filter="url(#zyvoraGlow)"/>
+      <path d="M19 92L38 73L53 82L72 62L84 70L107 43" fill="none" stroke="url(#zyvoraArrow)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
       <path d="M96 42H108V54" fill="none" stroke="#5eead4" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
   `;
-  const LOGO_SRC = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(NEXA_LOGO_SVG)}`;
+  const LOGO_SRC = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(ZYVORA_LOGO_SVG)}`;
 
   const CONTACT_EMAIL = "moonhyuk1010@gmail.com";
   const SERVICE_NOTICE =
-    "NEXA는 주식 및 금융시장 정보를 제공하는 참고용 서비스이며, 특정 종목의 매수·매도 또는 투자를 권유하지 않습니다. 모든 투자 결정과 그에 따른 손익 책임은 투자자 본인에게 있습니다.";
+    "ZYVORA는 주식 및 금융시장 정보를 제공하는 참고용 서비스이며, 특정 종목의 매수·매도 또는 투자를 권유하지 않습니다. 모든 투자 결정과 그에 따른 손익 책임은 투자자 본인에게 있습니다.";
   const DATA_SOURCES = ["Yahoo Finance", "Hyperliquid", "Google News", "TradingView", "NXT", "네이버 증권"];
-  const ADMIN_KEY = "nexa-admin-2026";
+  const ADMIN_KEY = "zyvora-admin-2026";
 
 
   const ETF_BASE_DATA = [
@@ -169,7 +169,7 @@ function App() {
   `;
 
   useEffect(() => {
-    document.title = "NEXA | 24H Global Markets";
+    document.title = "ZYVORA | 24H Global Markets";
 
     const faviconHref = LOGO_SRC;
     let favicon = document.querySelector("link[rel='icon']");
@@ -295,14 +295,14 @@ function App() {
 
   const getVisitorClientId = () => {
     try {
-      const savedId = window.localStorage.getItem("nexa_visitor_id");
+      const savedId = window.localStorage.getItem("zyvora_visitor_id");
 
       if (savedId) {
         return savedId;
       }
 
       const newId = `visitor-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      window.localStorage.setItem("nexa_visitor_id", newId);
+      window.localStorage.setItem("zyvora_visitor_id", newId);
       return newId;
     } catch (err) {
       return `visitor-fallback-${Date.now()}`;
@@ -2404,9 +2404,9 @@ function App() {
             <div style={styles.adminPageWrap}>
               <div style={styles.adminCard}>
                 <div style={styles.adminLogoRow}>
-                  <img src={LOGO_SRC} alt="NEXA" style={styles.adminLogo} />
+                  <img src={LOGO_SRC} alt="ZYVORA" style={styles.adminLogo} />
                   <div>
-                    <div style={styles.adminTitle}>NEXA 관리자</div>
+                    <div style={styles.adminTitle}>ZYVORA 관리자</div>
                     <div style={styles.adminSub}>접근 권한이 없습니다.</div>
                   </div>
                 </div>
@@ -2425,9 +2425,9 @@ function App() {
           <div style={styles.adminPageWrap}>
             <div style={styles.adminCard}>
               <div style={styles.adminLogoRow}>
-                <img src={LOGO_SRC} alt="NEXA" style={styles.adminLogo} />
+                <img src={LOGO_SRC} alt="ZYVORA" style={styles.adminLogo} />
                 <div>
-                  <div style={styles.adminTitle}>NEXA 관리자</div>
+                  <div style={styles.adminTitle}>ZYVORA 관리자</div>
                   <div style={styles.adminSub}>방문자 통계 전용 화면</div>
                 </div>
               </div>
@@ -2598,7 +2598,7 @@ function App() {
               <div style={logoMarkStyle}>
                 <img
                   src={LOGO_SRC}
-                  alt="NEXA"
+                  alt="ZYVORA"
                   style={styles.logoImage}
                   onError={(e) => {
                     e.currentTarget.style.display = "none";
@@ -2607,7 +2607,7 @@ function App() {
                 <span style={styles.logoFallback}>N</span>
               </div>
               <div style={styles.logoWrap}>
-                <div style={logoStyle}>NEXA</div>
+                <div style={logoStyle}>ZYVORA</div>
                 <div style={logoSubStyle}>
                   24H Global Markets
                 </div>
@@ -2662,7 +2662,7 @@ function App() {
             </button>
 
             <div style={styles.sidebarFooter}>
-              <div>© 2026 NEXA</div>
+              <div>© 2026 ZYVORA</div>
               <div style={styles.sidebarFooterSmall}>투자 판단 책임은 본인에게 있습니다.</div>
             </div>
           </aside>
@@ -2791,7 +2791,7 @@ function App() {
         <footer style={legalFooterStyle}>
           <div style={legalFooterTopStyle}>
             <div>
-              <div style={styles.legalFooterTitle}>NEXA</div>
+              <div style={styles.legalFooterTitle}>ZYVORA</div>
               <div style={styles.legalFooterSub}>24H Global Markets</div>
             </div>
 
@@ -2825,7 +2825,7 @@ function App() {
           <div style={legalFooterBottomStyle}>
             <span>본 서비스는 위 서비스들의 공개 데이터를 참고하여 자체적으로 가공·표시합니다.</span>
             <span>각 서비스와 공식 제휴 관계는 아닙니다.</span>
-            <span>© 2026 NEXA. All Rights Reserved.</span>
+            <span>© 2026 ZYVORA. All Rights Reserved.</span>
           </div>
         </footer>
       </div>
