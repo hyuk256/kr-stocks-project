@@ -29,6 +29,10 @@ function App() {
   const [hyperChartLoading, setHyperChartLoading] = useState(false);
   const [hyperChartError, setHyperChartError] = useState("");
   const [visitorStats, setVisitorStats] = useState({ active: 0, total: 0 });
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1200
+  );
+  const isMobile = windowWidth <= 768;
 
   const tabs = ["주식", "ETF", "차트", "분석", "이슈", "관심종목"];
   const API_BASE = "https://kr-stocks-project.onrender.com";
@@ -178,6 +182,17 @@ function App() {
 
     favicon.type = "image/svg+xml";
     favicon.href = faviconHref;
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const fetchStocks = async () => {
@@ -968,9 +983,182 @@ function App() {
     { label: "AI 요약", icon: "AI" },
   ];
 
-  const dashboardColumns = `${showLeftSidebar ? "240px " : ""}minmax(0, 1fr)${
-    showRightSidebar ? " 380px" : ""
-  }`;
+  const dashboardColumns = isMobile
+    ? "minmax(0, 1fr)"
+    : `${showLeftSidebar ? "240px " : ""}minmax(0, 1fr)${
+        showRightSidebar ? " 380px" : ""
+      }`;
+
+  const topInnerStyle = isMobile
+    ? {
+        ...styles.topInner,
+        gridTemplateColumns: "1fr",
+        padding: "12px 14px",
+        gap: "10px",
+      }
+    : styles.topInner;
+
+  const brandAreaStyle = isMobile
+    ? {
+        ...styles.brandArea,
+        gap: "9px",
+      }
+    : styles.brandArea;
+
+  const logoMarkStyle = isMobile
+    ? {
+        ...styles.logoMark,
+        width: "38px",
+        height: "38px",
+        borderRadius: "11px",
+      }
+    : styles.logoMark;
+
+  const logoStyle = isMobile
+    ? {
+        ...styles.logo,
+        fontSize: "22px",
+      }
+    : styles.logo;
+
+  const logoSubStyle = isMobile
+    ? {
+        ...styles.logoSub,
+        fontSize: "12px",
+      }
+    : styles.logoSub;
+
+  const headerStatusStyle = isMobile
+    ? {
+        ...styles.headerStatus,
+        justifyContent: "flex-start",
+        flexWrap: "wrap",
+        gap: "8px",
+        fontSize: "11px",
+      }
+    : styles.headerStatus;
+
+  const dashboardShellStyle = isMobile
+    ? {
+        ...styles.dashboardShell,
+        gridTemplateColumns: dashboardColumns,
+        padding: "12px 10px 0",
+        gap: "12px",
+        minHeight: "auto",
+      }
+    : {
+        ...styles.dashboardShell,
+        gridTemplateColumns: dashboardColumns,
+      };
+
+  const moverHeroHeaderStyle = isMobile
+    ? {
+        ...styles.moverHeroHeader,
+        flexDirection: "column",
+        gap: "8px",
+      }
+    : styles.moverHeroHeader;
+
+  const moverHeroGridStyle = isMobile
+    ? {
+        ...styles.moverHeroGrid,
+        gridTemplateColumns: "1fr",
+      }
+    : styles.moverHeroGrid;
+
+  const stockControlRowStyle = isMobile
+    ? {
+        ...styles.stockControlRow,
+        gridTemplateColumns: "1fr",
+        gap: "10px",
+      }
+    : styles.stockControlRow;
+
+  const stockInnerTabsStyle = isMobile
+    ? {
+        ...styles.stockInnerTabs,
+        gridTemplateColumns: "1fr",
+      }
+    : styles.stockInnerTabs;
+
+  const stockInnerTabButtonStyle = isMobile
+    ? {
+        ...styles.stockInnerTabButton,
+        minHeight: "44px",
+        padding: "11px 12px",
+      }
+    : styles.stockInnerTabButton;
+
+  const stockSearchPlaceholderStyle = isMobile
+    ? {
+        ...styles.stockSearchPlaceholder,
+        minHeight: "40px",
+        fontSize: "11px",
+        textAlign: "center",
+      }
+    : styles.stockSearchPlaceholder;
+
+  const sectionPanelStyle = isMobile
+    ? {
+        ...styles.sectionPanel,
+        padding: "12px",
+        borderRadius: "14px",
+      }
+    : styles.sectionPanel;
+
+  const sectionHeaderStyle = isMobile
+    ? {
+        ...styles.sectionHeader,
+        alignItems: "flex-start",
+        gap: "8px",
+      }
+    : styles.sectionHeader;
+
+  const gridStyle = isMobile
+    ? {
+        ...styles.grid,
+        gridTemplateColumns: "1fr",
+        gap: "12px",
+      }
+    : styles.grid;
+
+  const cardStyle = isMobile
+    ? {
+        ...styles.card,
+        padding: "13px",
+      }
+    : styles.card;
+
+  const legalFooterStyle = isMobile
+    ? {
+        ...styles.legalFooter,
+        margin: "14px 10px 0",
+        padding: "16px 14px",
+        borderRadius: "18px",
+      }
+    : styles.legalFooter;
+
+  const legalFooterTopStyle = isMobile
+    ? {
+        ...styles.legalFooterTop,
+        flexDirection: "column",
+      }
+    : styles.legalFooterTop;
+
+  const legalSourceRowStyle = isMobile
+    ? {
+        ...styles.legalSourceRow,
+        alignItems: "flex-start",
+        flexDirection: "column",
+      }
+    : styles.legalSourceRow;
+
+  const legalFooterBottomStyle = isMobile
+    ? {
+        ...styles.legalFooterBottom,
+        flexDirection: "column",
+      }
+    : styles.legalFooterBottom;
 
   const buildMiniSparklinePath = (stock, width = 138, height = 44) => {
     const percent = parsePercentValue(stock.percent_from_base);
@@ -1109,7 +1297,7 @@ function App() {
     return (
       <div
         key={`${stock.symbol}-${index}`}
-        style={styles.card}
+        style={cardStyle}
         onClick={() => handleStockClick(stock)}
       >
         <div style={styles.cardTopCompact}>
@@ -1231,15 +1419,15 @@ function App() {
 
     return (
       <div>
-        <div style={styles.stockControlRow}>
-          <div style={styles.stockInnerTabs}>
+        <div style={stockControlRowStyle}>
+          <div style={stockInnerTabsStyle}>
             <button
               onClick={() => {
                 setStockMarketTab("KR");
                 setStockSearch("");
               }}
               style={{
-                ...styles.stockInnerTabButton,
+                ...stockInnerTabButtonStyle,
                 background:
                   stockMarketTab === "KR"
                     ? "linear-gradient(135deg, #2563eb, #1d4ed8)"
@@ -1255,7 +1443,7 @@ function App() {
                 setStockSearch("");
               }}
               style={{
-                ...styles.stockInnerTabButton,
+                ...stockInnerTabButtonStyle,
                 background:
                   stockMarketTab === "US"
                     ? "linear-gradient(135deg, #2563eb, #1d4ed8)"
@@ -1271,7 +1459,7 @@ function App() {
                 setStockSearch("");
               }}
               style={{
-                ...styles.stockInnerTabButton,
+                ...stockInnerTabButtonStyle,
                 background:
                   stockMarketTab === "NXT"
                     ? "linear-gradient(135deg, #0f766e, #0891b2)"
@@ -1318,7 +1506,7 @@ function App() {
               )}
             </div>
           ) : (
-            <div style={styles.stockSearchPlaceholder}>
+            <div style={stockSearchPlaceholderStyle}>
               {stockMarketTab === "US"
                 ? "미국 기본 종목은 고정 목록만 표시됩니다."
                 : "24시간 지원 종목은 고정 목록만 표시됩니다."}
@@ -1328,8 +1516,8 @@ function App() {
 
         {stockMarketTab === "NXT" &&
           searchedStocksForCurrentMarket.length > 0 && (
-          <div style={styles.sectionPanel}>
-            <div style={styles.sectionHeader}>
+          <div style={sectionPanelStyle}>
+            <div style={sectionHeaderStyle}>
               <div>
                 <div style={styles.sectionTitle}>{searchedSectionTitle}</div>
                 <div style={styles.sectionSub}>
@@ -1355,7 +1543,7 @@ function App() {
               </button>
             </div>
 
-            <div style={styles.grid}>
+            <div style={gridStyle}>
               {searchedStocksForCurrentMarket.map((stock, index) =>
                 renderStockCard(stock, index)
               )}
@@ -1365,8 +1553,8 @@ function App() {
 
         {stockMarketTab === "KR" ? (
           <>
-            <div style={styles.sectionPanel}>
-              <div style={styles.sectionHeader}>
+            <div style={sectionPanelStyle}>
+              <div style={sectionHeaderStyle}>
                 <div>
                   <div style={styles.sectionTitle}>🔥 한국 대표 종목 <span style={styles.liveBadge}>KRX/NXT</span></div>
                   <div style={styles.sectionSub}>정규장에는 KRX, 장외 참고 시세는 NXT로 표시됩니다.</div>
@@ -1374,7 +1562,7 @@ function App() {
                 <div style={styles.sectionCount}>{displayRealtimeKrStocks.length}종목</div>
               </div>
 
-              <div style={styles.grid}>
+              <div style={gridStyle}>
                 {displayRealtimeKrStocks.map((stock, index) =>
                   renderStockCard(stock, index)
                 )}
@@ -1383,8 +1571,8 @@ function App() {
           </>
         ) : stockMarketTab === "NXT" ? (
           <>
-            <div style={styles.sectionPanel}>
-              <div style={styles.sectionHeader}>
+            <div style={sectionPanelStyle}>
+              <div style={sectionHeaderStyle}>
                 <div>
                   <div style={styles.sectionTitle}>📘 Yahoo/NXT 참고 시세</div>
                   <div style={styles.sectionSub}>KRX 최근 종가 기준 참고용 데이터</div>
@@ -1392,7 +1580,7 @@ function App() {
                 <div style={styles.sectionCount}>{displayReferenceKrStocks.length}종목</div>
               </div>
 
-              <div style={styles.grid}>
+              <div style={gridStyle}>
                 {displayReferenceKrStocks.map((stock, index) =>
                   renderStockCard(stock, index)
                 )}
@@ -1401,8 +1589,8 @@ function App() {
           </>
         ) : (
           <>
-            <div style={styles.sectionPanel}>
-              <div style={styles.sectionHeader}>
+            <div style={sectionPanelStyle}>
+              <div style={sectionHeaderStyle}>
                 <div>
                   <div style={styles.sectionTitle}>🇺🇸 미국 주식</div>
                   <div style={styles.sectionSub}>24H 거래소 기반 글로벌 자산 참고 시세</div>
@@ -1410,7 +1598,7 @@ function App() {
                 <div style={styles.sectionCount}>{displayStocks.length}종목</div>
               </div>
 
-              <div style={styles.grid}>
+              <div style={gridStyle}>
                 {displayStocks.map((stock, index) =>
                   renderStockCard(stock, index)
                 )}
@@ -1427,8 +1615,8 @@ function App() {
 
     return (
       <div>
-        <div style={styles.sectionPanel}>
-          <div style={styles.sectionHeader}>
+        <div style={sectionPanelStyle}>
+          <div style={sectionHeaderStyle}>
             <div>
               <div style={styles.sectionTitle}>🎯 ETF 종목</div>
               <div style={styles.sectionSub}>
@@ -1438,11 +1626,11 @@ function App() {
             <div style={styles.sectionCount}>{etfList.length}종목</div>
           </div>
 
-          <div style={styles.grid}>
+          <div style={gridStyle}>
             {etfList.map((etf, index) => (
               <div
                 key={`${etf.symbol}-etf-${index}`}
-                style={styles.card}
+                style={cardStyle}
                 onClick={() => {
                   setSelectedChart({
                     name: etf.name,
@@ -2311,8 +2499,8 @@ function App() {
       <div style={styles.app}>
         <style>{globalResetStyle}</style>
         <div style={styles.topBar}>
-          <div style={styles.topInner}>
-            <div style={styles.brandArea}>
+          <div style={topInnerStyle}>
+            <div style={brandAreaStyle}>
               <button
                 type="button"
                 style={styles.menuIcon}
@@ -2322,7 +2510,7 @@ function App() {
               </button>
 
               {isControlMenuOpen && (
-                <div style={styles.controlMenu}>
+                <div style={isMobile ? { ...styles.controlMenu, left: "10px", right: "10px", width: "auto", top: "54px" } : styles.controlMenu}>
                   <div style={styles.controlMenuHeader}>
                     <div>
                       <div style={styles.controlMenuTitle}>대시보드 메뉴</div>
@@ -2407,7 +2595,7 @@ function App() {
                 </div>
               )}
 
-              <div style={styles.logoMark}>
+              <div style={logoMarkStyle}>
                 <img
                   src={LOGO_SRC}
                   alt="NEXA"
@@ -2419,16 +2607,16 @@ function App() {
                 <span style={styles.logoFallback}>N</span>
               </div>
               <div style={styles.logoWrap}>
-                <div style={styles.logo}>NEXA</div>
-                <div style={styles.logoSub}>
+                <div style={logoStyle}>NEXA</div>
+                <div style={logoSubStyle}>
                   24H Global Markets
                 </div>
               </div>
             </div>
 
-            <div style={styles.topEmptySpace} />
+            <div style={isMobile ? { display: "none" } : styles.topEmptySpace} />
 
-            <div style={styles.headerStatus}>
+            <div style={headerStatusStyle}>
               <div style={styles.liveStatusDot} />
               <span>실시간 업데이트</span>
               <strong>{time || "--:--:--"}</strong>
@@ -2438,13 +2626,8 @@ function App() {
           </div>
         </div>
 
-        <div
-          style={{
-            ...styles.dashboardShell,
-            gridTemplateColumns: dashboardColumns,
-          }}
-        >
-          {showLeftSidebar && (
+        <div style={dashboardShellStyle}>
+          {showLeftSidebar && !isMobile && (
           <aside style={styles.leftSidebar}>
             <div style={styles.sidebarBlockTitle}>시장 개요</div>
 
@@ -2488,7 +2671,7 @@ function App() {
           <main style={styles.mainArea}>
             <div style={styles.hero}>
               <div style={styles.moverHero}>
-                <div style={styles.moverHeroHeader}>
+                <div style={moverHeroHeaderStyle}>
                   <div>
                     <div style={styles.moverHeroTitle}>🚀 오늘의 급등 종목</div>
                     <div style={styles.moverHeroSub}>24시간 거래 종목과 NXT 참고 종목의 상승률 TOP3를 한눈에 확인합니다.</div>
@@ -2500,7 +2683,7 @@ function App() {
                   </div>
                 </div>
 
-                <div style={styles.moverHeroGrid}>
+                <div style={moverHeroGridStyle}>
                   {renderTopMoverGroup({
                     title: "24H 급등 TOP3",
                     subTitle: "Hyperliquid 24시간 기준 상승률 상위 종목",
@@ -2536,7 +2719,7 @@ function App() {
             {renderContent()}
           </main>
 
-          {showRightSidebar && (
+          {showRightSidebar && !isMobile && (
           <aside style={styles.rightSidebar}>
             <div style={styles.sidePanel}>
               <div style={styles.sidePanelTitle}>마지막 업데이트</div>
@@ -2605,8 +2788,8 @@ function App() {
           )}
         </div>
 
-        <footer style={styles.legalFooter}>
-          <div style={styles.legalFooterTop}>
+        <footer style={legalFooterStyle}>
+          <div style={legalFooterTopStyle}>
             <div>
               <div style={styles.legalFooterTitle}>NEXA</div>
               <div style={styles.legalFooterSub}>24H Global Markets</div>
@@ -2628,7 +2811,7 @@ function App() {
             <span>{SERVICE_NOTICE}</span>
           </div>
 
-          <div style={styles.legalSourceRow}>
+          <div style={legalSourceRowStyle}>
             <span style={styles.legalSourceLabel}>데이터 참고 및 시장 리서치</span>
             <div style={styles.legalSourceList}>
               {DATA_SOURCES.map((source) => (
@@ -2639,7 +2822,7 @@ function App() {
             </div>
           </div>
 
-          <div style={styles.legalFooterBottom}>
+          <div style={legalFooterBottomStyle}>
             <span>본 서비스는 위 서비스들의 공개 데이터를 참고하여 자체적으로 가공·표시합니다.</span>
             <span>각 서비스와 공식 제휴 관계는 아닙니다.</span>
             <span>© 2026 NEXA. All Rights Reserved.</span>
